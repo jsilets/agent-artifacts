@@ -1,0 +1,267 @@
+/* explain.css: the look of every explain page.
+   Tokens and color ramps come from OpenIntelligentUI (MIT, CopilotKit). See ../NOTICE.md.
+   Pages use these classes only. A page never sets its own colors, fonts or sizes. */
+
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500&display=swap");
+
+/* ─── Tokens ─────────────────────────────────────────────────────── */
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --bg2: #f7f6f3;
+  --bg3: #efeee9;
+  --p: #1a1a1a;            /* primary text */
+  --s: #73726c;            /* secondary text */
+  --t: #9c9a92;            /* tertiary text */
+  --b: rgba(0, 0, 0, 0.12); /* hairline border */
+  --b2: rgba(0, 0, 0, 0.3); /* strong border */
+  --link: #185FA5;
+
+  --sans: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Spline Sans Mono", "SF Mono", ui-monospace, monospace;
+
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --gap: 16px;
+}
+:root[data-host="inline"] { --bg: transparent; }
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1a1a18;
+    --bg2: #2c2c2a;
+    --bg3: #222220;
+    --p: #e8e6de;
+    --s: #9c9a92;
+    --t: #73726c;
+    --b: rgba(255, 255, 255, 0.14);
+    --b2: rgba(255, 255, 255, 0.35);
+    --link: #85B7EB;
+  }
+  :root[data-host="inline"]:not([data-theme="light"]) { --bg: transparent; }
+}
+:root[data-theme="dark"] {
+  --bg: #1a1a18; --bg2: #2c2c2a; --bg3: #222220;
+  --p: #e8e6de; --s: #9c9a92; --t: #73726c;
+  --b: rgba(255, 255, 255, 0.14); --b2: rgba(255, 255, 255, 0.35); --link: #85B7EB;
+}
+
+/* ─── Color ramps ────────────────────────────────────────────────────
+   One class sets four variables. HTML parts and SVG parts both read them.
+   --fill: background · --line: border and arrows · --ink: strong text · --sub: weak text */
+.c-gray   { --fill: #F1EFE8; --line: #5F5E5A; --ink: #444441; --sub: #5F5E5A; }
+.c-purple { --fill: #EEEDFE; --line: #534AB7; --ink: #3C3489; --sub: #534AB7; }
+.c-teal   { --fill: #E1F5EE; --line: #0F6E56; --ink: #085041; --sub: #0F6E56; }
+.c-coral  { --fill: #FAECE7; --line: #993C1D; --ink: #712B13; --sub: #993C1D; }
+.c-pink   { --fill: #FBEAF0; --line: #993556; --ink: #72243E; --sub: #993556; }
+.c-blue   { --fill: #E6F1FB; --line: #185FA5; --ink: #0C447C; --sub: #185FA5; }
+.c-green  { --fill: #EAF3DE; --line: #3B6D11; --ink: #27500A; --sub: #3B6D11; }
+.c-amber  { --fill: #FAEEDA; --line: #854F0B; --ink: #633806; --sub: #854F0B; }
+.c-red    { --fill: #FCEBEB; --line: #A32D2D; --ink: #791F1F; --sub: #A32D2D; }
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .c-gray   { --fill: #444441; --line: #B4B2A9; --ink: #D3D1C7; --sub: #B4B2A9; }
+  :root:not([data-theme="light"]) .c-purple { --fill: #3C3489; --line: #AFA9EC; --ink: #CECBF6; --sub: #AFA9EC; }
+  :root:not([data-theme="light"]) .c-teal   { --fill: #085041; --line: #5DCAA5; --ink: #9FE1CB; --sub: #5DCAA5; }
+  :root:not([data-theme="light"]) .c-coral  { --fill: #712B13; --line: #F0997B; --ink: #F5C4B3; --sub: #F0997B; }
+  :root:not([data-theme="light"]) .c-pink   { --fill: #72243E; --line: #ED93B1; --ink: #F4C0D1; --sub: #ED93B1; }
+  :root:not([data-theme="light"]) .c-blue   { --fill: #0C447C; --line: #85B7EB; --ink: #B5D4F4; --sub: #85B7EB; }
+  :root:not([data-theme="light"]) .c-green  { --fill: #27500A; --line: #97C459; --ink: #C0DD97; --sub: #97C459; }
+  :root:not([data-theme="light"]) .c-amber  { --fill: #633806; --line: #EF9F27; --ink: #FAC775; --sub: #EF9F27; }
+  :root:not([data-theme="light"]) .c-red    { --fill: #791F1F; --line: #F09595; --ink: #F7C1C1; --sub: #F09595; }
+}
+:root[data-theme="dark"] .c-gray   { --fill: #444441; --line: #B4B2A9; --ink: #D3D1C7; --sub: #B4B2A9; }
+:root[data-theme="dark"] .c-purple { --fill: #3C3489; --line: #AFA9EC; --ink: #CECBF6; --sub: #AFA9EC; }
+:root[data-theme="dark"] .c-teal   { --fill: #085041; --line: #5DCAA5; --ink: #9FE1CB; --sub: #5DCAA5; }
+:root[data-theme="dark"] .c-coral  { --fill: #712B13; --line: #F0997B; --ink: #F5C4B3; --sub: #F0997B; }
+:root[data-theme="dark"] .c-pink   { --fill: #72243E; --line: #ED93B1; --ink: #F4C0D1; --sub: #ED93B1; }
+:root[data-theme="dark"] .c-blue   { --fill: #0C447C; --line: #85B7EB; --ink: #B5D4F4; --sub: #85B7EB; }
+:root[data-theme="dark"] .c-green  { --fill: #27500A; --line: #97C459; --ink: #C0DD97; --sub: #97C459; }
+:root[data-theme="dark"] .c-amber  { --fill: #633806; --line: #EF9F27; --ink: #FAC775; --sub: #EF9F27; }
+:root[data-theme="dark"] .c-red    { --fill: #791F1F; --line: #F09595; --ink: #F7C1C1; --sub: #F09595; }
+
+/* ─── Base ───────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+html { background: var(--bg); }
+body {
+  margin: 0;
+  font: 400 16px/1.6 var(--sans);
+  color: var(--p);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "tnum" 0;
+}
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code, kbd, pre { font-family: var(--mono); font-size: 0.875em; }
+:not(pre) > code { background: var(--bg2); padding: 1px 5px; border-radius: 4px; }
+pre { background: var(--bg2); border-radius: var(--r-md); padding: 12px 14px; overflow-x: auto; line-height: 1.5; margin: 0; }
+strong, b { font-weight: 600; }
+:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+
+/* ─── Page ───────────────────────────────────────────────────────── */
+.k-page { max-width: 760px; margin: 0 auto; padding: 32px 24px 56px; }
+:root[data-host="inline"] .k-page { padding: 8px 4px 16px; }
+.k-page > header h1 { font-size: 26px; line-height: 1.25; font-weight: 600; letter-spacing: -0.01em; margin: 0; }
+.k-stamp { font: 400 12px/1.4 var(--mono); color: var(--t); margin-top: 6px; }
+.k-lede { font-size: 18px; line-height: 1.5; color: var(--p); margin: 16px 0 0; max-width: 62ch; }
+
+.k-claim { margin-top: 40px; }
+.k-claim > h2 { font-size: 18px; line-height: 1.35; font-weight: 600; margin: 0 0 12px; max-width: 60ch; }
+.k-claim > p, .k-note { color: var(--s); font-size: 15px; margin: 12px 0 0; max-width: 64ch; }
+.k-claim > p:first-of-type:not(.k-note) { color: var(--p); }
+
+figure { margin: 0; min-width: 0; }
+figcaption { font-size: 13px; color: var(--s); margin-top: 8px; }
+.k-scroll { overflow-x: auto; }
+
+details.k-more { margin-top: 12px; border-top: 1px solid var(--b); padding-top: 8px; }
+details.k-more > summary { cursor: pointer; font-size: 14px; color: var(--s); list-style: none; }
+details.k-more > summary::before { content: "+ "; font-family: var(--mono); }
+details.k-more[open] > summary::before { content: "− "; }
+details.k-more > :not(summary) { margin-top: 12px; }
+
+/* ─── Chips and paths ────────────────────────────────────────────── */
+.k-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12px; font-weight: 500; line-height: 1;
+  padding: 4px 8px; border-radius: 999px;
+  background: var(--fill, var(--bg2)); color: var(--ink, var(--s));
+  border: 0.5px solid var(--line, var(--b));
+  white-space: nowrap;
+}
+.k-path { font: 400 12px var(--mono); color: var(--s); overflow-wrap: anywhere; }
+
+/* ─── Flow diagram (drawn by explain.js from a text spec) ────────── */
+.k-flow svg { display: block; width: 100%; height: auto; max-width: var(--w, 100%); margin: 0 auto; overflow: visible; }
+.k-flow .k-err, .k-err { font: 12px/1.5 var(--mono); white-space: pre-wrap; color: #A32D2D; background: #FCEBEB; padding: 8px 10px; border-radius: var(--r-md); }
+
+/* SVG classes. Hand-drawn SVG uses the same ones. */
+svg text { font-family: var(--sans); }
+svg text.th { font-size: 14px; font-weight: 500; fill: var(--ink, var(--p)); }
+svg text.t  { font-size: 14px; font-weight: 400; fill: var(--ink, var(--p)); }
+svg text.ts { font-size: 12px; font-weight: 400; fill: var(--sub, var(--s)); }
+svg text.tl { font-size: 12px; font-weight: 400; fill: var(--s); }
+.k-flow svg text.th { font-size: 13px; }   /* the flow layout measures labels at this size */
+.k-flow svg text.ts, .k-flow svg text.tl { font-size: 11.5px; }
+svg .box { fill: var(--fill, var(--bg2)); stroke: var(--line, var(--b2)); stroke-width: 0.75; }
+svg .arr { fill: none; stroke: var(--s); stroke-width: 1.5; }
+svg .arr.dash { stroke-dasharray: 5 4; }
+svg .arr.bold { stroke-width: 2.25; stroke: var(--p); }
+svg .lbl-bg { fill: var(--bg); }
+:root[data-host="inline"] svg .lbl-bg { fill: var(--bg2); }
+svg .grp { fill: none; stroke: var(--b2); stroke-width: 0.75; stroke-dasharray: 3 3; }
+svg .leader { fill: none; stroke: var(--t); stroke-width: 0.75; stroke-dasharray: 4 4; }
+svg .mark-new .box { stroke-width: 1.75; }
+svg .mark-gone { opacity: 0.45; }
+svg .mark-hl .box { stroke-width: 2.25; }
+
+/* ─── Layers: stacked bands for architecture ─────────────────────── */
+.k-layers { display: grid; gap: 6px; }
+.k-layer {
+  display: grid; grid-template-columns: 148px minmax(0, 1fr); gap: 12px; align-items: center;
+  padding: 10px 12px; border-radius: var(--r-md);
+  background: var(--fill, var(--bg2)); border: 0.5px solid var(--line, var(--b));
+}
+.k-layer > b { font-size: 14px; font-weight: 600; color: var(--ink, var(--p)); }
+.k-layer > b small { display: block; font-size: 12px; font-weight: 400; color: var(--sub, var(--s)); }
+.k-layer > div { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.k-layer .k-chip { background: var(--bg); color: var(--p); border-color: var(--line, var(--b)); }
+
+/* ─── Small multiples: one card per case, same parts each time ───── */
+.k-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+.k-card {
+  min-width: 0; padding: 14px; border-radius: var(--r-lg);
+  background: var(--bg); border: 0.5px solid var(--b2);
+}
+.k-card > h3 { font-size: 15px; font-weight: 600; margin: 0 0 4px; }
+.k-card > p { font-size: 14px; color: var(--s); margin: 6px 0 0; }
+.k-card > .k-chip { margin-bottom: 8px; }
+.k-card.c-gray, .k-card.c-purple, .k-card.c-teal, .k-card.c-coral, .k-card.c-pink,
+.k-card.c-blue, .k-card.c-green, .k-card.c-amber, .k-card.c-red { background: var(--fill); border-color: var(--line); }
+.k-card[class*="c-"] > h3 { color: var(--ink); }
+.k-card[class*="c-"] > p { color: var(--sub); }
+
+/* ─── Scale: a score out of N for each item, with a reason ───────── */
+.k-scale { display: grid; grid-template-columns: minmax(0, 1.2fr) auto minmax(0, 2fr); gap: 10px 16px; align-items: baseline; }
+.k-scale > b { font-size: 14px; font-weight: 500; }
+.k-scale > span { font-size: 14px; color: var(--s); }
+.k-dots { display: inline-flex; gap: 4px; align-items: center; font-size: 12px; color: var(--s); white-space: nowrap; }
+.k-dots i { width: 10px; height: 10px; border-radius: 50%; border: 1px solid var(--line, var(--s)); display: inline-block; }
+.k-dots i.on { background: var(--line, var(--s)); }
+
+/* ─── Bars and stats: every number gets a picture ────────────────── */
+.k-bars { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto; gap: 8px 12px; align-items: center; }
+.k-bars > b { font-size: 14px; font-weight: 500; }
+.k-bars > span { height: 10px; border-radius: 5px; background: var(--bg3); overflow: hidden; }
+.k-bars > span::before { content: ""; display: block; height: 100%; width: calc(var(--v, 0) * 1%); background: var(--line, var(--s)); border-radius: 5px; }
+.k-bars > output { font: 500 13px var(--mono); font-variant-numeric: tabular-nums; color: var(--p); }
+.k-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.k-stat { padding: 12px 14px; border-radius: var(--r-lg); background: var(--fill, var(--bg2)); }
+.k-stat > output { display: block; font-size: 28px; line-height: 1.1; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink, var(--p)); }
+.k-stat > span { font-size: 13px; color: var(--sub, var(--s)); }
+
+/* ─── Table: many rows, same columns ─────────────────────────────── */
+.k-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.k-table th { text-align: left; font-weight: 500; font-size: 12px; color: var(--s); padding: 6px 10px; border-bottom: 1px solid var(--b2); }
+.k-table td { padding: 8px 10px; border-bottom: 0.5px solid var(--b); vertical-align: top; }
+.k-table td.num, .k-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.k-table tr:last-child td { border-bottom: 0; }
+
+/* ─── Callout: one fact the reader must not miss ─────────────────── */
+.k-callout {
+  padding: 12px 14px; border-radius: var(--r-md); font-size: 15px;
+  background: var(--fill, var(--bg2)); color: var(--ink, var(--p)); border: 0.5px solid var(--line, var(--b));
+}
+
+/* ─── Model: inputs the reader moves, outputs that follow ────────── */
+.k-model { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; padding: 16px; border-radius: var(--r-lg); border: 0.5px solid var(--b2); }
+@media (max-width: 560px) { .k-model { grid-template-columns: minmax(0, 1fr); } }
+.k-in { display: grid; gap: 14px; align-content: start; }
+.k-in label { display: grid; gap: 6px; font-size: 13px; color: var(--s); }
+.k-in label > span { display: flex; justify-content: space-between; gap: 8px; }
+.k-in label output { font: 500 13px var(--mono); color: var(--p); font-variant-numeric: tabular-nums; }
+.k-out { display: grid; gap: 10px; align-content: start; }
+input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 4px; border-radius: 2px; background: var(--bg3); outline: none; }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--bg); border: 1px solid var(--b2); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); cursor: pointer; }
+input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--bg); border: 1px solid var(--b2); cursor: pointer; }
+button {
+  font: 500 13px var(--sans); color: var(--p); background: transparent;
+  padding: 6px 14px; border-radius: var(--r-md); border: 0.5px solid var(--b2); cursor: pointer;
+}
+button:hover { background: var(--bg2); }
+button:disabled { opacity: 0.4; cursor: default; }
+
+/* ─── Steps: a process the reader moves through one stage at a time ─ */
+.k-steps { border: 0.5px solid var(--b2); border-radius: var(--r-lg); padding: 16px; }
+.k-steps > .k-step { display: none; }
+.k-steps > .k-step.on { display: block; }
+.k-steps > .k-step > h3 { font-size: 15px; font-weight: 600; margin: 0 0 8px; }
+.k-steps > .k-step > p { font-size: 14px; color: var(--s); margin: 8px 0 0; }
+.k-steps nav { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+.k-steps nav .k-pos { font: 12px var(--mono); color: var(--t); margin-left: auto; }
+.no-js .k-steps > .k-step { display: block; margin-bottom: 16px; }
+
+/* ─── Mermaid (only for sequence and state diagrams) ─────────────── */
+pre.mermaid { background: transparent; padding: 0; text-align: center; font-family: var(--sans); }
+
+/* ─── Motion ─────────────────────────────────────────────────────── */
+@keyframes k-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.k-page > * { animation: k-in 0.35s ease-out both; }
+.k-page > *:nth-child(2) { animation-delay: 0.05s; }
+.k-page > *:nth-child(3) { animation-delay: 0.1s; }
+.k-page > *:nth-child(n+4) { animation-delay: 0.15s; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+@media (max-width: 560px) {
+  .k-layer { grid-template-columns: minmax(0, 1fr); }
+  .k-scale { grid-template-columns: minmax(0, 1fr) auto; }
+  .k-scale > span { grid-column: 1 / -1; margin-top: -6px; }
+}
+
+/* Dark mode: large colored areas use a softer mix, so a page of cards does not glare.
+   Chips and diagram nodes keep the full ramp. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) :is(.k-card[class*="c-"], .k-layer, .k-stat, .k-callout) { background: color-mix(in srgb, var(--fill, var(--bg2)) 45%, var(--bg2)); }
+}
+:root[data-theme="dark"] :is(.k-card[class*="c-"], .k-layer, .k-stat, .k-callout) { background: color-mix(in srgb, var(--fill, var(--bg2)) 45%, var(--bg2)); }

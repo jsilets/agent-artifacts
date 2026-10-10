@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<!-- SNAPSHOT: example at 0000000 (main) on 2026-10-10. This page explains code at one point in time. It is not a plan, a spec, a backlog or a source of truth. Do not plan work from it. Read the code instead. -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How Shortlink serves a click</title>
+<link rel="stylesheet" href="../kit/explain.css">
+<script src="../kit/explain.js" defer></script>
+<body>
+<main class="k-page">
+
+<header>
+  <h1>How Shortlink serves a click</h1>
+  <p class="k-stamp">example · 0000000 · 2026-10-10 · snapshot</p>
+  <p class="k-lede">The edge answers <b>94%</b> of clicks from its cache. Only a cache miss reaches Postgres.</p>
+</header>
+
+<section class="k-claim">
+  <h2>A click reaches Postgres only when the edge cache misses.</h2>
+  <figure>
+    <div class="k-flow"><script type="text/plain">
+      dir LR
+      user = Browser [pill]
+      edge = Edge worker / worker.ts [teal]
+      kv = Link cache / KV, 1 h TTL [db, teal]
+      api = Links API / api/links.ts [purple]
+      pg = Postgres / links table [db, purple]
+      q = Click queue [amber]
+      user -> edge : GET /abc
+      edge -> kv : reads
+      edge --> api : on a miss
+      api -> pg : selects
+      edge -> q : sends click
+    </script></div>
+    <figcaption>Solid arrows run on every click. The dashed arrow runs on a cache miss only.</figcaption>
+  </figure>
+  <p class="k-note">The edge sends each click to the queue after it answers, so the count never slows the redirect.</p>
+</section>
+
+<section class="k-claim">
+  <h2>Only the Links API writes to Postgres.</h2>
+  <figure>
+    <div class="k-layers">
+      <div class="k-layer c-teal"><b>Edge<small>reads only</small></b><div><span class="k-chip">worker.ts</span><span class="k-chip">KV cache</span></div></div>
+      <div class="k-layer c-purple"><b>API<small>reads and writes</small></b><div><span class="k-chip">api/links.ts</span><span class="k-chip">api/stats.ts</span><span class="k-chip">Postgres</span></div></div>
+      <div class="k-layer c-amber"><b>Jobs<small>reads the queue</small></b><div><span class="k-chip">jobs/rollup.ts</span><span class="k-chip">click queue</span></div></div>
+    </div>
+    <figcaption>Each band is one deploy unit. The second line of each band says what it can do to the data.</figcaption>
+  </figure>
+</section>
+
+<section class="k-claim">
+  <h2>Redirects keep working when Postgres, the queue or KV is down.</h2>
+  <figure>
+    <div class="k-grid">
+      <div class="k-card c-green"><span class="k-chip c-green">redirects work</span><h3>Postgres is down</h3><p>Cached links still redirect. New links fail.</p></div>
+      <div class="k-card c-amber"><span class="k-chip c-amber">counts late</span><h3>Queue is full</h3><p>The edge drops click events. Redirects work.</p></div>
+      <div class="k-card c-red"><span class="k-chip c-red">slow</span><h3>KV is down</h3><p>Every click goes to Postgres. p95 goes to 180 ms.</p></div>
+    </div>
+    <figcaption>Same three parts on each card: the status, the failure and the effect.</figcaption>
+  </figure>
+</section>
+
+<section class="k-claim">
+  <h2>Cloudflare KV is the best store for the link cache.</h2>
+  <figure>
+    <div class="k-scale">
+      <b>Cloudflare KV</b><span class="k-dots c-teal" data-score="5/5">5/5</span><span>Reads at the edge. Writes take 60 s to spread, and links rarely change.</span>
+      <b>Durable Objects</b><span class="k-dots c-teal" data-score="3/5">3/5</span><span>Strong reads, but one region per link adds 40 ms.</span>
+      <b>Postgres only</b><span class="k-dots c-teal" data-score="1/5">1/5</span><span>Every click crosses the network to one region.</span>
+    </div>
+    <figcaption>The score is the fit for a store that the system reads often and writes rarely.</figcaption>
+  </figure>
+</section>
+
+<section class="k-claim">
+  <h2>At a 94% hit rate, the average redirect takes 7.1 ms.</h2>
+  <figure>
+    <div class="k-model">
+      <div class="k-in">
+        <label><span>Cache hit rate <output data-show="hit" data-fmt="%0"></output></span><input type="range" data-var="hit" min="0.5" max="1" step="0.01" value="0.94"></label>
+        <label><span>Postgres read <output data-show="db" data-fmt="n0" data-unit="ms"></output></span><input type="range" data-var="db" min="5" max="200" step="5" value="40"></label>
+      </div>
+      <div class="k-out">
+        <div class="k-stat c-teal"><output data-out="avg" data-fmt="n1" data-unit="ms"></output><span>average redirect</span></div>
+        <div class="k-bars">
+          <b>Hits</b><span class="c-teal" data-bar="hit*100"></span><output data-out="hit*1000" data-fmt="n0" data-unit="of 1,000"></output>
+          <b>Misses</b><span class="c-purple" data-bar="(1-hit)*100"></span><output data-out="(1-hit)*1000" data-fmt="n0" data-unit="of 1,000"></output>
+        </div>
+      </div>
+      <script type="text/plain" data-defs>
+        edge = 4
+        avg = edge + (1 - hit) * (db + 12)
+      </script>
+    </div>
+    <figcaption>At a 94% hit rate, a database that is 20 ms slower adds only 1.2 ms to the average.</figcaption>
+  </figure>
+</section>
+
+<section class="k-claim">
+  <h2>A new link reaches every edge within 60 seconds.</h2>
+  <figure>
+    <div class="k-steps">
+      <div class="k-step"><h3>1 · The API writes the row</h3><p>The links table holds the source of truth. <span class="k-path">api/links.ts:42</span></p></div>
+      <div class="k-step"><h3>2 · The API writes KV</h3><p>KV starts to copy the key to every region.</p></div>
+      <div class="k-step"><h3>3 · Edges serve it</h3><p>Within 60 s, every edge answers from its cache.</p></div>
+    </div>
+    <figcaption>Use the arrow keys or the buttons.</figcaption>
+  </figure>
+</section>
+
+<section class="k-claim">
+  <h2>GET /:id carries 99% of all requests.</h2>
+  <figure>
+    <div class="k-scroll"><table class="k-table">
+      <tr><th>Route</th><th>Owner</th><th class="num">Calls / day</th><th>Status</th></tr>
+      <tr><td><code>GET /:id</code></td><td>Edge</td><td class="num">2,400,000</td><td><span class="k-chip c-green">live</span></td></tr>
+      <tr><td><code>POST /links</code></td><td>API</td><td class="num">3,100</td><td><span class="k-chip c-green">live</span></td></tr>
+      <tr><td><code>GET /stats/:id</code></td><td>API</td><td class="num">18,000</td><td><span class="k-chip c-amber">partial</span></td></tr>
+      <tr><td><code>DELETE /links/:id</code></td><td>API</td><td class="num">40</td><td><span class="k-chip c-gray">not built</span></td></tr>
+    </table></div>
+    <figcaption>Status colors are fixed: green is live, amber is partial, gray is not built, red is broken.</figcaption>
+  </figure>
+</section>
+
+</main>
+</body>
+</html>
