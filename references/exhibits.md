@@ -46,6 +46,7 @@ The runtime lays out and draws the diagram. You write a text spec. You never com
   | src | col | db |
   | .   | q   | .  |
   ```
+- If arrow labels collide or sit far from their arrows, place the nodes with grid rows. A grid almost always fixes it.
 - 12 nodes at most. About 18 characters for a label line and 24 for a subtitle; the layout wraps longer text.
 
 ## .k-layers: parts and owners

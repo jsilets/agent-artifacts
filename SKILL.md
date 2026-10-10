@@ -45,6 +45,8 @@ Choose the content before the form. A page that shows the wrong points in a good
 4. Give space by weight. The point that answers the question gets the first claim and the largest figure. A minor point never gets the same size as a major one.
 5. Do the cut test on each claim: "If I delete this, can the reader still answer the question?" If yes, delete it.
 
+Decisions that you own, such as how to store an export, are not for the reader. Leave them out of the page.
+
 When you redo an existing page or doc, do not keep its outline. Start again from the question. In the chat reply, list what you cut in one line, so the user can ask for any of it back.
 
 ## 3. Write the claims
@@ -81,6 +83,8 @@ Rules for every exhibit:
 - Use 2 or 3 color ramps in one figure. Color shows meaning, and it is the same meaning on the whole page.
 - Status colors are fixed: `c-green` is live or done, `c-amber` is partial, `c-gray` is not built, `c-red` is broken.
 - A flow has 12 nodes at most. If it needs more, split it into an overview and a zoom.
+- One exhibit can combine kit parts that show one thing, such as `.k-stats` above `.k-bars` for the same numbers. Two figures that show two things are two claims.
+- A number in a note is fine when it is a condition or a date. A number that is the point gets a picture.
 - Use only the kit classes. Do not set colors, fonts or sizes in a page. A page with its own `<style>` block is wrong unless the kit cannot draw the figure. For that case, see the SVG rules in `references/exhibits.md`.
 
 ## 5. Write the words
@@ -160,7 +164,8 @@ node "$E" pack <page> --inline       # one file, under 512 KB; writes <page>.pac
 3. Show the page.
    - In T3 Code, call `html_render` with the packed HTML, a title, and `contentHeight` as the height. The page appears above your reply.
    - Without `html_render`, give the path and open it in the preview.
-4. The chat reply is 1 or 2 sentences. Add only what the page does not say, such as a question for the user. Do not announce the page, and do not repeat it.
+4. The chat reply is 1 or 2 sentences that add what the page does not say. After them, add the one-line list of cuts (for a redo) and the questions for the user. Do not announce the page, and do not repeat it.
+5. If you cannot get a screenshot, say so in the reply. Do not claim that you checked the look.
 
 ## Before you show it
 

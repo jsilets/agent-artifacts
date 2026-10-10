@@ -8,7 +8,7 @@
 //
 // --inline marks the page for a host that draws its own background (T3 Code html_render).
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync, realpathSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, realpathSync, statSync } from 'node:fs';
 import { dirname, join, resolve, basename } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { homedir } from 'node:os';
@@ -108,7 +108,7 @@ function lint(html, file) {
     if (/^(?:two|three|four|five|six|seven|2|3|4|5|6|7)\s/i.test(t)) warn(`${no}: "${t}" starts with a count. Keep the count only if it is the finding; otherwise state what the items have in common`);
     if (/:\s/.test(t)) warn(`${no}: "${t}" has a colon. State the claim as one plain sentence`);
     if (/,\s*(?:and|but)\s+only\b|\bnot just\b|\brather than\b|,\s*not\s/i.test(t)) warn(`${no}: "${t}" adds a second clause or a contrast. Keep the one fact that the figure proves`);
-    if ((t.match(/[,;]/g) || []).length >= 2) warn(`${no}: "${t}" has several clauses. One heading states one fact`);
+    if (/;/.test(t) || (t.replace(/(\d),(\d)/g, '$1$2').match(/,/g) || []).length >= 2) warn(`${no}: "${t}" has several clauses. One heading states one fact`);
     const top = c.replace(/<details[\s\S]*?<\/details>/g, '');
     const figs = (top.match(/<figure[\s>]/g) || []).length;
     if (figs === 0) err(`${no} "${t.slice(0, 50)}": no <figure>. Each claim gets one exhibit`);
@@ -177,7 +177,7 @@ async function cmdServe() {
   const { createServer } = await import('node:http');
   createServer((req, res) => {
     const p = resolve(root, '.' + decodeURIComponent(new URL(req.url, 'http://x').pathname));
-    if (!p.startsWith(root) || !existsSync(p)) { res.writeHead(404); res.end('not found'); return; }
+    if (!p.startsWith(root) || !existsSync(p) || !statSync(p).isFile()) { res.writeHead(404); res.end('not found'); return; }
     res.writeHead(200, { 'content-type': p.endsWith('.html') ? 'text/html; charset=utf-8' : p.endsWith('.css') ? 'text/css' : p.endsWith('.js') ? 'text/javascript' : 'application/octet-stream' });
     res.end(readFileSync(p));
   }).listen(port, '127.0.0.1', () => console.log(`http://127.0.0.1:${port}/${basename(file)}`));
