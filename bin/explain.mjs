@@ -6,7 +6,7 @@
 //   explain.mjs pack <page.html> [-o out.html] [--inline]          lint, then inline the kit into one file
 //   explain.mjs serve <page.html> [--port 8765]                    serve the page's folder on 127.0.0.1, print the URL
 //
-// --inline marks the page for a host that draws its own background (T3 Code html_render).
+// --inline marks the page for an inline host (T3 Code html_render): it gets less padding.
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync, realpathSync, statSync } from 'node:fs';
 import { dirname, join, resolve, basename } from 'node:path';
@@ -44,6 +44,7 @@ function cmdNew() {
   if (existsSync(out)) { console.error(`exists, not overwritten: ${out}`); process.exit(1); }
   const t = title || slug.replace(/-/g, ' ').replace(/^./, (c) => c.toUpperCase());
   const html = readFileSync(join(KIT, 'template.html'), 'utf8')
+    .replace('href="explain.css"', `href="${join(KIT, 'explain.css')}"`).replace('src="explain.js"', `src="${join(KIT, 'explain.js')}"`)
     .replaceAll('{{TITLE}}', t).replaceAll('{{REPO}}', repo).replaceAll('{{SHA}}', sha).replaceAll('{{BRANCH}}', branch).replaceAll('{{DATE}}', date);
   writeFileSync(out, html);
   console.log(out);

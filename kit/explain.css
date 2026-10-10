@@ -25,7 +25,6 @@
   --r-lg: 12px;
   --gap: 16px;
 }
-:root[data-host="inline"] { --bg: transparent; }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -39,7 +38,6 @@
     --b2: rgba(255, 255, 255, 0.35);
     --link: #85B7EB;
   }
-  :root[data-host="inline"]:not([data-theme="light"]) { --bg: transparent; }
 }
 :root[data-theme="dark"] {
   --bg: #1a1a18; --bg2: #2c2c2a; --bg3: #222220;
@@ -80,6 +78,9 @@
 :root[data-theme="dark"] .c-green  { --fill: #27500A; --line: #97C459; --ink: #C0DD97; --sub: #97C459; }
 :root[data-theme="dark"] .c-amber  { --fill: #633806; --line: #EF9F27; --ink: #FAC775; --sub: #EF9F27; }
 :root[data-theme="dark"] .c-red    { --fill: #791F1F; --line: #F09595; --ink: #F7C1C1; --sub: #F09595; }
+
+/* The page always paints its own background. A transparent page can show dark-mode text
+   on a light host, because the host and the page can read different color schemes. */
 
 /* ─── Base ───────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
@@ -150,7 +151,6 @@ svg .arr { fill: none; stroke: var(--s); stroke-width: 1.5; }
 svg .arr.dash { stroke-dasharray: 5 4; }
 svg .arr.bold { stroke-width: 2.25; stroke: var(--p); }
 svg .lbl-bg { fill: var(--bg); }
-:root[data-host="inline"] svg .lbl-bg { fill: var(--bg2); }
 svg .grp { fill: none; stroke: var(--b2); stroke-width: 0.75; stroke-dasharray: 3 3; }
 svg .leader { fill: none; stroke: var(--t); stroke-width: 0.75; stroke-dasharray: 4 4; }
 svg .mark-new .box { stroke-width: 1.75; }
