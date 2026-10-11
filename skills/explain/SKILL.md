@@ -9,12 +9,12 @@ The user reads pictures faster than paragraphs. Your default is a wall of text. 
 
 ```
 <this skill's directory>/
-  kit/explain.css  kit/explain.js   ← the look and the runtime. Never restyle them in a page.
-  kit/template.html                 ← "bin/explain.mjs new" copies it
-  bin/explain.mjs                   ← new · check · pack · serve
-  references/exhibits.md            ← the markup for each exhibit. Read it before you write a page.
-  examples/gallery.html             ← every exhibit on one page. Copy its parts.
+  references/exhibits.md   ← the markup for each exhibit. Read it before you write a page.
+  examples/gallery.html    ← every exhibit on one page. Copy its parts.
+agent-artifacts            ← the CLI on PATH: new · check · pack · serve · publish
 ```
+
+The CLI and the kit (`kit/explain.css`, `kit/explain.js`) live in the agent-artifacts repo. Every page links the kit. Never restyle the kit in a page.
 
 ## 1. Pick the lightest output that works
 
@@ -141,7 +141,7 @@ When the page is complete, do one more pass on the words only. For each claim, l
 
 An explain page shows the code at one commit on one date. It goes stale the next day. Agents that find a stale page in a repo read it as a plan or as the truth. So:
 
-- `bin/explain.mjs new <slug>` writes the page to `~/.agent/explain/<repo>/<date>-<slug>.html`. That folder is outside every repo. This is the default.
+- `agent-artifacts new <slug>` writes the page to `~/.agent/explain/<repo>/<date>-<slug>.html`. That folder is outside every repo. This is the default.
 - Write a page into a repo only when the user asks for that. Then the page keeps its `SNAPSHOT` comment and its `.k-stamp` line, which tell agents not to plan from it.
 - Never write "next steps", "TODO" or "not built yet, build this next" as a claim. To show what does not exist, use a `c-gray` "not built" chip, and state it as a fact of that commit.
 - When a decision is worth keeping, it does not go in the page. Tell the user, and offer to record it as an ADR or in `CONTEXT.md`.
@@ -149,17 +149,16 @@ An explain page shows the code at one commit on one date. It goes stale the next
 ## 7. Make, check, look, show
 
 ```bash
-E="<this skill's directory>/bin/explain.mjs"
-node "$E" new engine-overview --title "How the engine moves data"   # prints the path
+agent-artifacts new engine-overview --title "How the engine moves data"   # prints the path
 # write the page: claims first, then exhibits
-node "$E" check <page>               # errors stop you; warnings are budgets
-node "$E" pack <page> --inline       # one file, under 512 KB; writes <page>.packed.html
+agent-artifacts check <page>               # errors stop you; warnings are budgets
+agent-artifacts pack <page> --inline       # one file, under 512 KB; writes <page>.packed.html
 ```
 
 1. Run `check`. Fix every error. Fix each warning, or keep it only if you can say why.
 2. Look at the page before the user does.
    - In T3 Code, call `html_preview` with the packed HTML. Read the screenshot, the console output and `contentHeight`.
-   - Without `html_preview`, run `node "$E" serve <packed page>` in the background, then use `preview_open` and `preview_snapshot`.
+   - Without `html_preview`, run `agent-artifacts serve <packed page>` in the background, then use `preview_open` and `preview_snapshot`.
    - Check that no label is clipped, no arrow crosses a label, and nothing overflows at 390 px wide. Check dark mode too.
 3. Show the page.
    - In T3 Code, call `html_render` with the packed HTML, a title, and `contentHeight` as the height. The page appears above your reply.

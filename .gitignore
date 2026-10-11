@@ -1,0 +1,9 @@
+node_modules/
+.DS_Store
+*.packed.html
+.wrangler/
+.cf/
+.dev.vars
+.env*
+# The deploy profile holds personal values: hostname, account, Access AUD, email.
+host/deploy.local.json

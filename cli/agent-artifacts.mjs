@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// explain.mjs: make, check and pack explain pages. Node 18+, no dependencies.
+// agent-artifacts: make, check and pack explain pages. Node 18+, no dependencies.
 //
-//   explain.mjs new <slug> [--title "Title"] [--dir <out dir>]   write a page skeleton, print its path
-//   explain.mjs check <page.html>                                 lint; exit 1 on errors
-//   explain.mjs pack <page.html> [-o out.html] [--inline]          lint, then inline the kit into one file
-//   explain.mjs serve <page.html> [--port 8765]                    serve the page's folder on 127.0.0.1, print the URL
+//   agent-artifacts new <slug> [--title "Title"] [--dir <out dir>]   write a page skeleton, print its path
+//   agent-artifacts check <page.html>                                 lint; exit 1 on errors
+//   agent-artifacts pack <page.html> [-o out.html] [--inline]          lint, then inline the kit into one file
+//   agent-artifacts serve <page.html> [--port 8765]                    serve the page's folder on 127.0.0.1, print the URL
 //
 // --inline marks the page for an inline host (T3 Code html_render): it gets less padding.
 
@@ -33,7 +33,7 @@ function read(p) { if (!p || !existsSync(p)) { console.error(`no such file: ${p}
 function cmdNew() {
   const title = flag('--title'), dir = flag('--dir');
   const slug = (rest[0] || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  if (!slug) { console.error('give a slug: explain.mjs new engine-overview'); process.exit(2); }
+  if (!slug) { console.error('give a slug: agent-artifacts new engine-overview'); process.exit(2); }
   const top = git(['rev-parse', '--show-toplevel'], process.cwd());
   const repo = top ? basename(top) : basename(process.cwd());
   const sha = git(['rev-parse', '--short', 'HEAD'], process.cwd()) || 'no-git';
@@ -86,7 +86,7 @@ function lint(html, file) {
   } catch {}
 
   // Shape
-  if (!/<!--\s*SNAPSHOT:/.test(html)) err('missing the SNAPSHOT comment at the top. Start from "explain.mjs new"');
+  if (!/<!--\s*SNAPSHOT:/.test(html)) err('missing the SNAPSHOT comment at the top. Start from "agent-artifacts new"');
   if (!/class="k-stamp"/.test(html)) err('missing the .k-stamp line under the h1');
   const h1 = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
   if (!h1) err('missing the h1 title');
@@ -188,4 +188,4 @@ if (cmd === 'new') cmdNew();
 else if (cmd === 'check') process.exit(report(lint(read(rest[0]), rest[0])) ? 1 : 0);
 else if (cmd === 'pack') cmdPack();
 else if (cmd === 'serve') cmdServe();
-else { console.error('usage: explain.mjs new <slug> [--title T] [--dir D] | check <page> | pack <page> [-o out] [--inline] | serve <page> [--port N]'); process.exit(2); }
+else { console.error('usage: agent-artifacts new <slug> [--title T] [--dir D] | check <page> | pack <page> [-o out] [--inline] | serve <page> [--port N]'); process.exit(2); }
