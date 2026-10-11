@@ -9,32 +9,136 @@ const data = (v: unknown) => JSON.stringify(v).replace(/</g, '\\u003c');
 
 const day = (iso: string) => iso.slice(0, 10);
 
+/** "Oct 11" in UTC, for the version list. */
+const shortDay = (iso: string) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+
+// ─── Icons: 24-unit grid, drawn with the current text color ──────────
+const ICON: Record<string, string> = {
+  grid: '<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/>',
+  left: '<path d="M14.5 17 9.5 12l5-5"/>',
+  right: '<path d="m9.5 17 5-5-5-5"/>',
+  down: '<path d="m7 10 5 5 5-5"/>',
+  link: '<path d="M10 13.5a4.5 4.5 0 0 0 6.4.4l2.7-2.7a4.5 4.5 0 0 0-6.4-6.4l-1.2 1.2"/><path d="M14 10.5a4.5 4.5 0 0 0-6.4-.4l-2.7 2.7a4.5 4.5 0 0 0 6.4 6.4l1.2-1.2"/>',
+  check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+  more: '<circle cx="5.5" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="18.5" cy="12" r="1.2" fill="currentColor"/>',
+  auto: '<rect x="3" y="4.5" width="18" height="12" rx="2"/><path d="M8.5 20h7M12 16.5V20"/>',
+  sun: '<circle cx="12" cy="12" r="3.6"/><path d="M12 3v1.8M12 19.2V21M3 12h1.8M19.2 12H21M5.6 5.6l1.3 1.3M17.1 17.1l1.3 1.3M5.6 18.4l1.3-1.3M17.1 6.9l1.3-1.3"/>',
+  moon: '<path d="M20 14.2A8 8 0 0 1 9.8 4a8 8 0 1 0 10.2 10.2Z"/>',
+  open: '<path d="M14 4h6v6M20 4l-8.5 8.5M18 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10"/>',
+  download: '<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/>',
+  trash: '<path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l.9 12.1a1.5 1.5 0 0 0 1.5 1.4h6.2a1.5 1.5 0 0 0 1.5-1.4L17.5 7"/>',
+  x: '<path d="m7 7 10 10M17 7 7 17"/>',
+};
+const icon = (name: string) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[name]}</svg>`;
+
 const HOST_CSS = `
-html, body { height: 100%; margin: 0; background: var(--bg); color: var(--p); font-family: var(--sans); }
-a { color: var(--link); text-decoration: none; }
-a:hover { text-decoration: underline; }
-button, select, input { font: 500 13px var(--sans); color: var(--p); background: var(--bg); border: 0.5px solid var(--b2); border-radius: var(--r-sm); padding: 5px 10px; }
-button { cursor: pointer; }
-button:hover { background: var(--bg2); }
-.h-bar { display: flex; align-items: center; gap: 12px; height: 48px; padding: 0 16px; border-bottom: 0.5px solid var(--b); box-sizing: border-box; }
-.h-bar .h-title { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.h-bar .k-stamp { margin: 0; white-space: nowrap; }
-.h-grow { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 12px; overflow: hidden; }
-.h-frame { display: block; width: 100%; height: calc(100% - 48px); border: 0; }
-.h-panel { position: absolute; right: 16px; top: 52px; width: 420px; max-width: calc(100vw - 32px); background: var(--bg); border: 0.5px solid var(--b2); border-radius: var(--r-md); padding: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.12); }
-.h-panel[hidden] { display: none; }
-.h-panel h3 { margin: 0 0 8px; font-size: 14px; }
-.h-panel ul { list-style: none; margin: 8px 0 0; padding: 0; }
-.h-panel li { display: flex; gap: 8px; align-items: center; padding: 6px 0; border-top: 0.5px solid var(--b); font-size: 13px; }
-.h-panel li code { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 12px var(--mono); }
-.h-panel .h-danger { margin-top: 12px; color: var(--ink); }
+html, body { height: 100%; margin: 0; background: var(--bg); color: var(--p); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+button { font-family: var(--sans); }
+
+/* ─── The bar ───────────────────────────────────────────── */
+.v { --bar: 44px; display: flex; flex-direction: column; height: 100%; }
+.v-bar { position: relative; z-index: 10; flex: none; display: flex; align-items: center; gap: 2px; height: var(--bar); padding: 0 8px 0 6px; border-bottom: 0.5px solid var(--b); background: var(--bg); box-sizing: border-box; }
+.v-crumb { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; margin-left: 2px; font-size: 13.5px; line-height: 1; }
+.v-repo { flex: 0 1 auto; max-width: 30%; color: var(--s); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v-slash { color: var(--t); }
+.v-title { flex: 0 1 auto; min-width: 0; font-weight: 600; letter-spacing: -0.005em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v-frame { flex: 1; display: block; width: 100%; border: 0; background: var(--bg); }
+
+.v-icon { position: relative; flex: none; display: inline-grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--s); cursor: pointer; text-decoration: none; }
+.v-icon:hover, .v-icon[aria-expanded="true"] { background: var(--bg2); color: var(--p); }
+svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.v-icon.is-done { color: var(--ink); }
+
+/* The version pill: the one place the version shows. Amber when the reader is not on the latest. */
+.v-ver { flex: none; display: inline-flex; align-items: center; height: 28px; margin-right: 4px; padding: 0 2px; border: 0.5px solid var(--b2); border-radius: 999px; font: 500 12px var(--mono); color: var(--s); }
+.v-ver.is-old { background: var(--fill); border-color: var(--line); color: var(--ink); }
+.v-step { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 999px; color: inherit; }
+.v-step:hover { background: var(--bg2); }
+.v-ver.is-old .v-step:hover { background: color-mix(in srgb, var(--line) 18%, transparent); }
+.v-step[aria-disabled="true"] { opacity: 0.3; pointer-events: none; }
+.v-step svg { width: 14px; height: 14px; }
+.v-cur { display: inline-flex; align-items: center; gap: 2px; height: 22px; padding: 0 4px 0 6px; border: 0; border-radius: 999px; background: transparent; font: inherit; color: inherit; cursor: pointer; }
+.v-cur b { font-weight: 600; color: var(--p); }
+.v-ver.is-old .v-cur b { color: var(--ink); }
+.v-cur:hover, .v-cur[aria-expanded="true"] { background: var(--bg2); }
+.v-ver.is-old .v-cur:hover, .v-ver.is-old .v-cur[aria-expanded="true"] { background: color-mix(in srgb, var(--line) 18%, transparent); }
+.v-cur svg { width: 12px; height: 12px; opacity: 0.6; margin-left: 2px; }
+.v-of { margin-left: 3px; opacity: 0.75; }
+.v-item.v-latest { background: var(--fill); color: var(--ink); }
+.v-item.v-latest > svg, .v-item.v-latest .v-meta { color: var(--ink); }
+.v-item.v-latest:hover { background: color-mix(in srgb, var(--fill) 80%, var(--line)); }
+
+.v-share { flex: none; height: 30px; margin-left: 6px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--p); color: var(--bg); font: 600 13px var(--sans); cursor: pointer; }
+.v-share:hover { opacity: 0.86; }
+
+/* Tooltips: shown after a short pause, never while a menu is open. */
+[data-tip]:hover::after, [data-tip]:focus-visible::after { content: attr(data-tip); position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%); z-index: 40; padding: 4px 7px; border-radius: 6px; background: var(--p); color: var(--bg); font: 500 11.5px/1.2 var(--sans); white-space: nowrap; pointer-events: none; animation: v-tip 0.12s 0.4s both; }
+[data-tip-end]:hover::after, [data-tip-end]:focus-visible::after { left: auto; right: 0; transform: none; }
+[data-tip][aria-expanded="true"]::after { display: none; }
+@keyframes v-tip { from { opacity: 0; } }
+
+/* ─── Menus and popovers ────────────────────────────────── */
+.v-pop { position: absolute; top: calc(var(--bar) - 4px); right: 8px; z-index: 30; min-width: 232px; max-width: calc(100vw - 16px); padding: 6px; box-sizing: border-box; background: var(--bg); border: 0.5px solid var(--b2); border-radius: 12px; box-shadow: 0 14px 36px rgba(0, 0, 0, 0.16), 0 2px 6px rgba(0, 0, 0, 0.06); transform-origin: top right; animation: v-pop 0.14s ease-out; }
+.v-pop[hidden] { display: none; }
+@keyframes v-pop { from { opacity: 0; transform: translateY(-4px) scale(0.98); } }
+.v-label { padding: 8px 10px 6px; font: 500 11.5px var(--sans); color: var(--t); }
+.v-item { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 34px; padding: 6px 10px; box-sizing: border-box; border: 0; border-radius: 8px; background: transparent; color: var(--p); font: 500 13px var(--sans); text-align: left; text-decoration: none; cursor: pointer; }
+.v-item:hover, .v-item:focus-visible { background: var(--bg2); outline: none; }
+.v-item > svg { color: var(--s); }
+.v-item .v-meta { margin-left: auto; font: 12px var(--mono); color: var(--t); white-space: nowrap; }
+.v-item.is-danger, .v-item.is-danger > svg { color: var(--line); }
+.v-item.is-armed { background: var(--fill); }
+.v-hr { height: 0.5px; margin: 6px 4px; background: var(--b); }
+
+.v-vitem .v-mark { width: 16px; display: grid; place-items: center; color: var(--p); }
+.v-vitem .v-mark svg { visibility: hidden; }
+.v-vitem[aria-current="page"] .v-mark svg { visibility: visible; }
+.v-vitem .v-num { font: 600 12.5px var(--mono); min-width: 28px; }
+.v-tag { padding: 2px 7px; border-radius: 999px; background: var(--bg2); font: 500 11px var(--sans); color: var(--s); }
+
+.v-seg { display: flex; gap: 2px; margin: 0 4px 4px; padding: 2px; border-radius: 9px; background: var(--bg2); }
+.v-seg button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 28px; padding: 0 8px; border: 0; border-radius: 7px; background: transparent; color: var(--s); font: 500 12.5px var(--sans); cursor: pointer; }
+.v-seg button:hover { color: var(--p); }
+.v-seg button[aria-pressed="true"] { background: var(--bg); color: var(--p); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14), 0 0 0 0.5px var(--b); }
+.v-seg svg { width: 14px; height: 14px; }
+
+/* Share popover */
+.v-sharepop { width: 344px; padding: 14px; }
+.v-sharepop h2 { margin: 0; font: 600 14px var(--sans); }
+.v-sharepop p { margin: 4px 0 12px; font-size: 12.5px; line-height: 1.45; color: var(--s); }
+.v-sharepop .v-seg { margin: 0 0 8px; }
+.v-create { width: 100%; height: 34px; border: 0; border-radius: 8px; background: var(--p); color: var(--bg); font: 600 13px var(--sans); cursor: pointer; }
+.v-create:hover { opacity: 0.86; }
+.v-create:disabled { opacity: 0.5; cursor: default; }
+.v-links { list-style: none; margin: 12px 0 0; padding: 0; }
+.v-links:empty::before { content: "No active links."; display: block; padding: 4px 2px; font-size: 12.5px; color: var(--t); }
+.v-links li { display: flex; align-items: center; gap: 4px; height: 36px; padding-left: 2px; border-top: 0.5px solid var(--b); }
+.v-links code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 12px var(--mono); color: var(--s); }
+.v-links .v-tag { margin-right: 4px; }
+.v-links .v-icon { width: 28px; height: 28px; }
+.v-links .v-icon.is-armed { width: auto; padding: 0 8px; background: var(--fill); color: var(--ink); font: 600 12px var(--sans); }
+
+.v-toast { position: fixed; left: 50%; bottom: 24px; z-index: 50; transform: translateX(-50%); padding: 8px 14px; border-radius: 999px; background: var(--p); color: var(--bg); font: 500 13px var(--sans); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18); animation: v-pop 0.16s ease-out; }
+.v-toast[hidden] { display: none; }
+
+@media (max-width: 640px) {
+  .v-repo, .v-slash, .v-step { display: none; }
+  .v-sharepop { width: calc(100vw - 16px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .v-pop, .v-toast, [data-tip]:hover::after, [data-tip]:focus-visible::after { animation: none; }
+}
+
+/* ─── Library ───────────────────────────────────────────── */
 .h-lib { max-width: 760px; margin: 0 auto; padding: 32px 24px 56px; }
 .h-lib h1 { font-size: 24px; margin: 0 0 16px; }
-.h-lib input { width: 100%; box-sizing: border-box; padding: 8px 12px; font-size: 14px; }
+.h-lib input { width: 100%; box-sizing: border-box; padding: 8px 12px; border: 0.5px solid var(--b2); border-radius: 8px; background: var(--bg); color: var(--p); font: 500 14px var(--sans); }
 .h-lib h2 { font: 500 12px var(--mono); color: var(--s); margin: 28px 0 6px; text-transform: none; }
 .h-lib ul { list-style: none; margin: 0; padding: 0; }
 .h-lib li { display: flex; gap: 12px; align-items: baseline; padding: 8px 0; border-top: 0.5px solid var(--b); }
-.h-lib li a { flex: 1; font-weight: 500; }
+.h-lib li a { flex: 1; font-weight: 500; color: var(--p); text-decoration: none; }
+.h-lib li a:hover { color: var(--link); }
 .h-lib li span { font: 12px var(--mono); color: var(--t); white-space: nowrap; }
 .h-empty { color: var(--s); margin-top: 24px; }
 `;
@@ -116,93 +220,231 @@ export interface ViewerInput {
   followsLatest: boolean;
 }
 
-/** Cycles the theme: auto (follow the OS), light, dark. The frame reloads with ?theme= so the page draws it. */
-const THEME_SCRIPT = `
-const frame = document.querySelector('iframe');
-const btn = document.getElementById('theme');
-const NAMES = { auto: 'Theme: auto', light: 'Theme: light', dark: 'Theme: dark' };
-let theme = 'auto';
-try { theme = localStorage.getItem('theme') || 'auto'; } catch {}
-function apply() {
-  if (theme === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = theme;
-  btn.textContent = NAMES[theme] || NAMES.auto;
-  frame.src = frame.dataset.src + (theme === 'auto' ? '' : '?theme=' + theme);
-}
-btn.addEventListener('click', () => {
-  theme = { auto: 'light', light: 'dark', dark: 'auto' }[theme] || 'auto';
-  try { if (theme === 'auto') localStorage.removeItem('theme'); else localStorage.setItem('theme', theme); } catch {}
-  apply();
-});
-apply();`;
-
 const SANDBOX = 'allow-scripts allow-popups allow-popups-to-escape-sandbox';
 
-function stamp(repo: string | null, v: VersionRow) {
-  return [repo, v.sha, `v${v.version}`, day(v.created_at)].filter(Boolean).map(esc).join(' · ');
+/** The Appearance control and the ⋯ menu items that both viewers share. */
+function appearance() {
+  return `<div class="v-label">Appearance</div>
+    <div class="v-seg" role="group" aria-label="Appearance">
+      <button type="button" data-theme-set="auto">${icon('auto')}Auto</button>
+      <button type="button" data-theme-set="light">${icon('sun')}Light</button>
+      <button type="button" data-theme-set="dark">${icon('moon')}Dark</button>
+    </div>`;
 }
+
+/**
+ * Popovers, the theme and the toast, for both viewers. One popover is open at a time.
+ * A click in the frame does not reach this document, so the window blur event closes them.
+ */
+const COMMON_SCRIPT = `
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+let open = null;
+function closePop(focus) {
+  if (!open) return;
+  open.pop.hidden = true;
+  open.btn.setAttribute('aria-expanded', 'false');
+  if (focus) open.btn.focus();
+  open = null;
+}
+function items(pop) { return $$('a[href], button:not(:disabled)', pop).filter((e) => e.offsetParent); }
+$$('[data-pop]').forEach((btn) => {
+  const pop = document.getElementById(btn.dataset.pop);
+  btn.setAttribute('aria-expanded', 'false');
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const was = open && open.pop === pop;
+    closePop();
+    if (was) return;
+    pop.hidden = false;
+    const r = btn.getBoundingClientRect();
+    pop.style.right = Math.max(8, Math.min(window.innerWidth - r.right, window.innerWidth - pop.offsetWidth - 8)) + 'px';
+    btn.setAttribute('aria-expanded', 'true');
+    open = { pop, btn };
+    pop.dispatchEvent(new Event('open'));
+    if (e.detail === 0) items(pop)[0]?.focus();
+  });
+  pop.addEventListener('click', (e) => e.stopPropagation());
+  pop.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    const list = items(pop), i = list.indexOf(document.activeElement);
+    list[(i + (e.key === 'ArrowDown' ? 1 : list.length - 1)) % list.length]?.focus();
+    e.preventDefault();
+  });
+});
+document.addEventListener('click', () => closePop());
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePop(true); });
+window.addEventListener('blur', () => closePop());
+
+const toastEl = $('#toast');
+let toastTimer;
+function toast(text) {
+  toastEl.textContent = text;
+  toastEl.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (toastEl.hidden = true), 1800);
+}
+
+const frame = $('iframe');
+let theme = 'auto';
+try { theme = localStorage.getItem('theme') || 'auto'; } catch {}
+function applyTheme() {
+  if (theme === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = theme;
+  $$('[data-theme-set]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.themeSet === theme)));
+  const src = frame.dataset.src + (theme === 'auto' ? '' : '?theme=' + theme);
+  if (frame.getAttribute('src') !== src) frame.src = src;
+}
+$$('[data-theme-set]').forEach((b) => b.addEventListener('click', () => {
+  theme = b.dataset.themeSet;
+  try { if (theme === 'auto') localStorage.removeItem('theme'); else localStorage.setItem('theme', theme); } catch {}
+  applyTheme();
+}));
+applyTheme();
+`;
 
 export function viewerHtml(input: ViewerInput, nonce: string) {
   const { slug, title, repo, version, versions, latest } = input;
-  const options = versions
-    .map((v) => `<option value="${v.version}"${v.version === version.version ? ' selected' : ''}>v${v.version} · ${esc(day(v.created_at))}${v.version === latest ? ' · latest' : ''}</option>`)
+  const n = version.version;
+  const old = n !== latest;
+  const href = (v: number) => (v === latest ? `/p/${esc(slug)}` : `/p/${esc(slug)}/v/${v}`);
+  const step = (dir: 'left' | 'right', v: number, label: string) => {
+    const ok = versions.some((x) => x.version === v);
+    return `<a class="v-step" ${ok ? `href="${href(v)}"` : 'aria-disabled="true"'} aria-label="${label}">${icon(dir)}</a>`;
+  };
+  const versionItems = versions
+    .map(
+      (v) => `<a class="v-item v-vitem" href="${href(v.version)}"${v.version === n ? ' aria-current="page"' : ''}>
+        <span class="v-mark">${icon('check')}</span><span class="v-num">v${v.version}</span>
+        ${v.version === latest ? '<span class="v-tag">Latest</span>' : ''}
+        <span class="v-meta">${esc(shortDay(v.created_at))}${v.sha ? ` · ${esc(v.sha)}` : ''}</span></a>`,
+    )
     .join('');
-  const body = `<header class="h-bar">
-  <a href="/" title="All pages">Artifacts</a>
-  <div class="h-grow"><span class="h-title">${esc(title)}</span><p class="k-stamp">${stamp(repo, version)}</p></div>
-  <select id="ver" aria-label="Version">${options}</select>
-  <button id="theme" title="Follow the OS, or force light or dark">Theme: auto</button>
-  <button id="copy">Copy link</button>
-  <button id="share" aria-expanded="false">Share</button>
+  const body = `<div class="v">
+<header class="v-bar">
+  <a class="v-icon" href="/" data-tip="All pages" aria-label="All pages">${icon('grid')}</a>
+  <div class="v-crumb">${repo ? `<span class="v-repo">${esc(repo)}</span><span class="v-slash">/</span>` : ''}<span class="v-title">${esc(title)}</span></div>
+  <div class="v-ver${old ? ' c-amber is-old' : ''}">
+    ${step('left', n - 1, 'Previous version')}
+    <button type="button" class="v-cur" data-pop="pop-ver" aria-label="Version ${n} of ${latest}. Show all versions"><b>v${n}</b><span class="v-of">/${latest}</span>${icon('down')}</button>
+    ${step('right', n + 1, 'Next version')}
+  </div>
+  <button type="button" class="v-icon" id="copy" data-tip="Copy link" aria-label="Copy link">${icon('link')}</button>
+  <button type="button" class="v-icon" data-pop="pop-more" data-tip="More" aria-label="More">${icon('more')}</button>
+  <button type="button" class="v-share" data-pop="pop-share">Share</button>
+
+  <div class="v-pop" id="pop-ver" hidden>
+    ${old ? `<a class="v-item c-amber v-latest" href="/p/${esc(slug)}">${icon('right')}<span>Go to the latest version</span><span class="v-meta">v${latest}</span></a><div class="v-hr"></div>` : ''}
+    <div class="v-label">${versions.length} ${versions.length === 1 ? 'version' : 'versions'}</div>
+    ${versionItems}
+  </div>
+  <div class="v-pop" id="pop-more" hidden>
+    ${appearance()}
+    <div class="v-hr"></div>
+    <a class="v-item" href="/raw/${esc(slug)}/${n}" target="_blank" rel="noopener">${icon('open')}Open in new tab</a>
+    <a class="v-item" href="/raw/${esc(slug)}/${n}" download="${esc(slug.replace('/', '-'))}-v${n}.html">${icon('download')}Download HTML</a>
+    <div class="v-hr"></div>
+    <button type="button" class="v-item is-danger c-red" id="del">${icon('trash')}<span>Delete page</span></button>
+  </div>
+  <div class="v-pop v-sharepop" id="pop-share" hidden>
+    <h2>Share</h2>
+    <p>Anyone with a link can read this page without signing in. Revoke a link to stop it at once.</p>
+    <div class="v-seg" role="group" aria-label="Link points to">
+      <button type="button" data-target="latest" aria-pressed="true">Latest version</button>
+      <button type="button" data-target="${n}" aria-pressed="false">Only v${n}</button>
+    </div>
+    <button type="button" class="v-create" id="create">Create link</button>
+    <ul class="v-links" id="links"></ul>
+  </div>
 </header>
-<div class="h-panel" id="panel" hidden>
-  <h3>Share links</h3>
-  <p class="k-stamp">Anyone with a link can read the page. No login.</p>
-  <button id="mk-latest">New link to the latest version</button>
-  <button id="mk-this">New link to v${version.version}</button>
-  <ul id="shares"></ul>
-  <button class="h-danger c-red" id="del">Delete this page and all versions</button>
+<iframe class="v-frame" title="${esc(title)}" sandbox="${SANDBOX}" data-src="/raw/${esc(slug)}/${n}"></iframe>
 </div>
-<iframe class="h-frame" title="${esc(title)}" sandbox="${SANDBOX}" data-src="/raw/${esc(slug)}/${version.version}"></iframe>
-<script type="application/json" id="data">${data({ slug, version: version.version, followsLatest: input.followsLatest })}</script>`;
-  const script = THEME_SCRIPT + `
-const D = JSON.parse(document.getElementById('data').textContent);
-const $ = (id) => document.getElementById(id);
-const api = (path, init = {}) => fetch(path, { ...init, headers: { 'content-type': 'application/json', ...(init.headers || {}) } }).then(async (r) => { if (!r.ok) throw new Error(await r.text()); return r.status === 204 ? null : r.json(); });
-const copy = (text, btn) => navigator.clipboard.writeText(text).then(() => { const t = btn.textContent; btn.textContent = 'Copied'; setTimeout(() => (btn.textContent = t), 1200); });
-$('ver').addEventListener('change', (e) => { location.href = '/p/' + D.slug + '/v/' + e.target.value; });
-$('copy').addEventListener('click', (e) => copy(location.origin + '/p/' + D.slug + (D.followsLatest ? '' : '/v/' + D.version), e.target));
-async function load() {
+<div class="v-toast" id="toast" role="status" hidden></div>
+<script type="application/json" id="data">${data({ slug, version: n, followsLatest: input.followsLatest, icons: { link: ICON.link, check: ICON.check, x: ICON.x } })}</script>`;
+
+  const script =
+    COMMON_SCRIPT +
+    `
+const D = JSON.parse($('#data').textContent);
+const svg = (name) => '<svg viewBox="0 0 24 24" aria-hidden="true">' + D.icons[name] + '</svg>';
+const api = (path, init = {}) => fetch(path, { ...init, headers: { 'content-type': 'application/json', ...(init.headers || {}) } })
+  .then(async (r) => { if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.statusText); return r.status === 204 ? null : r.json(); });
+const copyText = (text) => navigator.clipboard.writeText(text);
+
+// Copy link: the icon turns into a check for a moment.
+$('#copy').addEventListener('click', (e) => {
+  const btn = e.currentTarget;
+  copyText(location.origin + '/p/' + D.slug + (D.followsLatest ? '' : '/v/' + D.version)).then(() => {
+    btn.innerHTML = svg('check'); btn.classList.add('is-done', 'c-green');
+    toast('Link copied');
+    setTimeout(() => { btn.innerHTML = svg('link'); btn.classList.remove('is-done', 'c-green'); }, 1400);
+  });
+});
+
+// Delete: the first click arms the item, the second click deletes.
+$('#del').addEventListener('click', async (e) => {
+  const b = e.currentTarget;
+  if (!b.classList.contains('is-armed')) { b.classList.add('is-armed'); b.querySelector('span').textContent = 'Click again to delete every version'; return; }
+  try { await api('/api/pages/' + D.slug, { method: 'DELETE' }); location.href = '/'; } catch (err) { toast('Delete failed: ' + err.message); }
+});
+$('#pop-more').addEventListener('open', () => { const b = $('#del'); b.classList.remove('is-armed'); b.querySelector('span').textContent = 'Delete page'; });
+
+// Share links
+let target = 'latest';
+$$('[data-target]').forEach((b) => b.addEventListener('click', () => {
+  target = b.dataset.target;
+  $$('[data-target]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+}));
+async function loadLinks() {
   const list = await api('/api/pages/' + D.slug + '/shares');
-  const ul = $('shares');
-  ul.replaceChildren();
-  for (const s of list) {
+  const ul = $('#links');
+  ul.replaceChildren(...list.map((s) => {
     const li = document.createElement('li');
-    const code = document.createElement('code'); code.textContent = s.url;
-    const what = document.createElement('span'); what.className = 'k-stamp'; what.textContent = s.version ? 'v' + s.version : 'latest';
-    const c = document.createElement('button'); c.textContent = 'Copy'; c.onclick = () => copy(s.url, c);
-    const r = document.createElement('button'); r.textContent = 'Revoke';
-    r.onclick = async () => { if (confirm('Revoke this link? It stops working at once.')) { await api('/api/shares/' + s.token, { method: 'DELETE' }); load(); } };
-    li.append(what, code, c, r);
-    ul.append(li);
-  }
+    const code = document.createElement('code'); code.textContent = s.url.replace(/^https?:\\/\\//, ''); code.title = s.url;
+    const tag = document.createElement('span'); tag.className = 'v-tag'; tag.textContent = s.version ? 'v' + s.version : 'Latest';
+    const c = document.createElement('button'); c.type = 'button'; c.className = 'v-icon'; c.innerHTML = svg('link'); c.setAttribute('aria-label', 'Copy link'); c.dataset.tip = 'Copy';
+    c.onclick = () => copyText(s.url).then(() => toast('Link copied'));
+    const r = document.createElement('button'); r.type = 'button'; r.className = 'v-icon c-red'; r.innerHTML = svg('x'); r.setAttribute('aria-label', 'Revoke link'); r.dataset.tip = 'Revoke'; r.dataset.tipEnd = '';
+    r.onclick = async () => {
+      if (!r.classList.contains('is-armed')) { r.classList.add('is-armed'); r.textContent = 'Revoke'; delete r.dataset.tip; return; }
+      await api('/api/shares/' + s.token, { method: 'DELETE' }); toast('Link revoked'); loadLinks();
+    };
+    li.append(code, tag, c, r);
+    return li;
+  }));
 }
-$('share').addEventListener('click', () => { const p = $('panel'); p.hidden = !p.hidden; $('share').setAttribute('aria-expanded', String(!p.hidden)); if (!p.hidden) load(); });
-const make = (version) => api('/api/pages/' + D.slug + '/shares', { method: 'POST', body: JSON.stringify({ version }) }).then((s) => navigator.clipboard.writeText(s.url).catch(() => {})).then(load);
-$('mk-latest').addEventListener('click', () => make('latest'));
-$('mk-this').addEventListener('click', () => make(D.version));
-$('del').addEventListener('click', async () => { if (confirm('Delete ' + D.slug + ', every version and every share link?')) { await api('/api/pages/' + D.slug, { method: 'DELETE' }); location.href = '/'; } });`;
+$('#pop-share').addEventListener('open', loadLinks);
+$('#create').addEventListener('click', async (e) => {
+  const b = e.currentTarget; b.disabled = true;
+  try {
+    const s = await api('/api/pages/' + D.slug + '/shares', { method: 'POST', body: JSON.stringify({ version: target === 'latest' ? 'latest' : +target }) });
+    await copyText(s.url).then(() => toast('Link created and copied'), () => toast('Link created'));
+    await loadLinks();
+  } catch (err) { toast('Could not create the link: ' + err.message); }
+  b.disabled = false;
+});
+`;
   return shell(title, nonce, body, script);
 }
 
 export function sharedHtml(input: { token: string; title: string; repo: string | null; version: VersionRow }, nonce: string) {
-  const body = `<header class="h-bar">
-  <div class="h-grow"><span class="h-title">${esc(input.title)}</span><p class="k-stamp">${stamp(input.repo, input.version)}</p></div>
-  <button id="theme" title="Follow the OS, or force light or dark">Theme: auto</button>
+  const raw = `/s/${esc(input.token)}/raw`;
+  const body = `<div class="v">
+<header class="v-bar">
+  <div class="v-crumb"><span class="v-title">${esc(input.title)}</span></div>
+  <button type="button" class="v-icon" data-pop="pop-more" data-tip="More" data-tip-end aria-label="More">${icon('more')}</button>
+  <div class="v-pop" id="pop-more" hidden>
+    ${appearance()}
+    <div class="v-hr"></div>
+    <a class="v-item" href="${raw}" target="_blank" rel="noopener">${icon('open')}Open in new tab</a>
+    <a class="v-item" href="${raw}" download="${esc(input.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'page')}.html">${icon('download')}Download HTML</a>
+  </div>
 </header>
-<iframe class="h-frame" title="${esc(input.title)}" sandbox="${SANDBOX}" data-src="/s/${esc(input.token)}/raw"></iframe>`;
-  return shell(input.title, nonce, body, THEME_SCRIPT, '/s/_/explain.css');
+<iframe class="v-frame" title="${esc(input.title)}" sandbox="${SANDBOX}" data-src="${raw}"></iframe>
+</div>
+<div class="v-toast" id="toast" role="status" hidden></div>`;
+  return shell(input.title, nonce, body, COMMON_SCRIPT, '/s/_/explain.css');
 }
 
 export function messageHtml(title: string, text: string, nonce: string, cssPath?: string) {
-  return shell(title, nonce, `<main class="h-lib"><h1>${esc(title)}</h1><p class="h-empty">${esc(text)}</p></main>`, "", cssPath);
+  return shell(title, nonce, `<main class="h-lib"><h1>${esc(title)}</h1><p class="h-empty">${esc(text)}</p></main>`, '', cssPath);
 }
