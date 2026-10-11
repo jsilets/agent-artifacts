@@ -153,6 +153,7 @@ agent-artifacts new engine-overview --title "How the engine moves data"   # prin
 # write the page: claims first, then exhibits
 agent-artifacts check <page>               # errors stop you; warnings are budgets
 agent-artifacts pack <page> --inline       # one file, under 512 KB; writes <page>.packed.html
+agent-artifacts publish <page>             # sends the page to the host; prints its URL
 ```
 
 1. Run `check`. Fix every error. Fix each warning, or keep it only if you can say why.
@@ -163,8 +164,11 @@ agent-artifacts pack <page> --inline       # one file, under 512 KB; writes <pag
 3. Show the page.
    - In T3 Code, call `html_render` with the packed HTML, a title, and `contentHeight` as the height. The page appears above your reply.
    - Without `html_render`, give the path and open it in the preview.
-4. The chat reply is 1 or 2 sentences that add what the page does not say. After them, add the one-line list of cuts (for a redo) and the questions for the user. Do not announce the page, and do not repeat it.
-5. If you cannot get a screenshot, say so in the reply. Do not claim that you checked the look.
+4. Publish the page with `agent-artifacts publish <page>`. Give the unpacked page, because `publish` packs it for the host. Publish every page, and publish it again after each change: each publish makes a new version of the same slug. Put the URL that it prints in the reply.
+   - Make a share link (`--share`) only when the user asks for one. A share link lets anyone read the page with no login.
+   - If `publish` exits with code 3, the host or its credentials are not set. Say so in the reply, and do not retry.
+5. The chat reply is 1 or 2 sentences that add what the page does not say. After them, add the one-line list of cuts (for a redo) and the questions for the user. Do not announce the page, and do not repeat it.
+6. If you cannot get a screenshot, say so in the reply. Do not claim that you checked the look.
 
 ## Before you show it
 
@@ -177,4 +181,5 @@ agent-artifacts pack <page> --inline       # one file, under 512 KB; writes <pag
 □ no prose paragraph repeats what a figure shows
 □ check passes; you looked at the screenshot in light and dark mode
 □ the page is in ~/.agent/explain, unless the user asked for the repo
+□ the page is published, and the reply gives its URL; no share link unless the user asked
 ```
