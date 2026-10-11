@@ -1,8 +1,11 @@
 // agent-pages: stores HTML pages with versions, shows them in a sandboxed viewer,
 // and serves share links. See ../README.md for the routes and the auth model.
 import kitCss from '../../kit/explain.css?raw';
+import faviconSvg from '../../brand/mark-small.svg?raw';
+import faviconIco from '../../brand/favicon.ico?inline';
+import touchIcon from '../../brand/apple-touch-icon.png?inline';
 import { verifyAccessJwt, type Identity } from './auth';
-import { blobKey, claimId, ftsQuery, newToken, pageChunks, parseMeta, parseTheme, route, thumbKey, withTheme, type Theme } from './lib';
+import { blobKey, claimId, type IconName, ftsQuery, newToken, pageChunks, parseMeta, parseTheme, route, thumbKey, withTheme, type Theme } from './lib';
 import { libraryHtml, messageHtml, sharedHtml, viewerHtml, type PageRow, type VersionRow } from './views';
 
 interface Env {
@@ -78,6 +81,15 @@ async function rawPage(obj: R2ObjectBody, immutable: boolean, theme: Theme | nul
 }
 
 const now = () => new Date().toISOString();
+
+/** Vite inlines the binary icons as data URLs. */
+const fromDataUrl = (url: string) => Uint8Array.from(atob(url.slice(url.indexOf(',') + 1)), (c) => c.charCodeAt(0));
+
+const ICON_FILES: Record<IconName, { body: string | Uint8Array; type: string }> = {
+  'favicon.svg': { body: faviconSvg, type: 'image/svg+xml' },
+  'favicon.ico': { body: fromDataUrl(faviconIco), type: 'image/x-icon' },
+  'apple-touch-icon.png': { body: fromDataUrl(touchIcon), type: 'image/png' },
+};
 
 async function identify(req: Request, env: Env): Promise<Identity | null> {
   // Local development has no Access in front of it.
@@ -249,6 +261,10 @@ async function handle(req: Request, env: Env, ctx: ExecutionContext): Promise<Re
   const css = () => new Response(kitCss, { headers: { ...BASE_HEADERS, 'content-type': 'text/css; charset=utf-8', 'cache-control': 'public, max-age=300' } });
   // The kit CSS is public, so a share link can load it with no login.
   if (r.kind === 'share-css') return css();
+  if (r.kind === 'icon') {
+    const f = ICON_FILES[r.name];
+    return new Response(f.body, { headers: { ...BASE_HEADERS, 'content-type': f.type, 'cache-control': 'public, max-age=86400' } });
+  }
 
   // Share links: Access lets /s/* through with no login, so the token is the only check.
   if (r.kind === 'share-view' || r.kind === 'share-raw') {

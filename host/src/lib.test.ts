@@ -98,6 +98,15 @@ describe('new routes', () => {
   });
 });
 
+describe('icon routes', () => {
+  it('serves the icons under /s/_/ and /favicon.ico', () => {
+    expect(route('/s/_/favicon.svg')).toEqual({ kind: 'icon', name: 'favicon.svg' });
+    expect(route('/s/_/apple-touch-icon.png')).toEqual({ kind: 'icon', name: 'apple-touch-icon.png' });
+    expect(route('/favicon.ico')).toEqual({ kind: 'icon', name: 'favicon.ico' });
+    expect(route('/s/_/other.png')).toEqual({ kind: 'not-found' });
+  });
+});
+
 describe('ftsQuery', () => {
   it('quotes each word and matches its prefix', () => {
     expect(ftsQuery('Legis engine')).toBe('"legis"* "engine"*');

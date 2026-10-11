@@ -60,6 +60,7 @@ export type Route =
   | { kind: 'raw'; slug: string; version: number }
   | { kind: 'kit-css' }
   | { kind: 'share-css' }
+  | { kind: 'icon'; name: IconName }
   | { kind: 'api-list' }
   | { kind: 'api-page'; slug: string }
   | { kind: 'api-shares'; slug: string }
@@ -74,6 +75,10 @@ export type Route =
 
 const NUM = /^[1-9][0-9]{0,8}$/;
 
+/** The site icons. They sit under /s/_/, which Access lets through, so share links show them too. */
+export const ICONS = ['favicon.svg', 'favicon.ico', 'apple-touch-icon.png'] as const;
+export type IconName = (typeof ICONS)[number];
+
 /** Maps a path to a route. Every slug is exactly two parts, so the routes never overlap. */
 export function route(path: string): Route {
   const p = path.split('/').slice(1);
@@ -82,6 +87,8 @@ export function route(path: string): Route {
   if (path === '/') return { kind: 'library' };
   if (path === '/_/explain.css') return { kind: 'kit-css' };
   if (path === '/s/_/explain.css') return { kind: 'share-css' };
+  if (path === '/favicon.ico') return { kind: 'icon', name: 'favicon.ico' };
+  if (p[0] === 's' && p[1] === '_' && p.length === 3 && (ICONS as readonly string[]).includes(p[2])) return { kind: 'icon', name: p[2] as IconName };
   if (p[0] === 'p' && ok && p.length === 3) return { kind: 'view', slug, version: null };
   if (p[0] === 'p' && ok && p.length === 5 && p[3] === 'v' && NUM.test(p[4])) return { kind: 'view', slug, version: +p[4] };
   if (p[0] === 'raw' && ok && p.length === 4 && NUM.test(p[3])) return { kind: 'raw', slug, version: +p[3] };

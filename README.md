@@ -8,6 +8,7 @@ The repo has four parts:
 |---|---|
 | `skills/explain/` | The `explain` skill. It tells an agent how to choose the content of a page, which figure to use for each claim, and how to write the words. |
 | `kit/` | `explain.css` and `explain.js`: the look and the runtime that every page shares. |
+| `brand/` | The mark. `mark.svg` is the master, `mark-small.svg` is the cut for 16 to 32 px (the favicon), and `mark-square.svg` is for platforms that round the corners. `favicon.ico` and `apple-touch-icon.png` are rendered from them. |
 | `cli/` | `agent-pages`: `new`, `check`, `pack`, `serve`, `publish` and `list`. Node 18 or later, no dependencies. |
 | `host/` | A Cloudflare Worker: the library, the viewer, the API and the share links. |
 
@@ -48,6 +49,7 @@ Without a host, the skill still works. Pages go to `~/.agent/explain/<repo>/`, a
 | `GET /p/<group>/<name>/v/<n>` | Access | The viewer for one version |
 | `GET /raw/<group>/<name>/<n>` | Access | The page HTML, with the sandbox CSP |
 | `GET /t/<group>/<name>/<n>/<light or dark>.webp` | Access | A thumbnail |
+| `GET /s/_/favicon.svg`, `favicon.ico`, `apple-touch-icon.png` | None | The site icons, which share links show too |
 | `GET /api/pages` | Access | The page list as JSON |
 | `GET /api/search?q=<words>` | Access | The best match on each page, best page first |
 | `PUT`, `DELETE /api/pages/<group>/<name>/pin` | Access | Pin or unpin a page |

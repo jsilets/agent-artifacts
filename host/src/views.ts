@@ -244,6 +244,9 @@ function shell(title: string, nonce: string, body: string, script = '', cssPath 
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>${esc(title)}</title>
+<link rel="icon" href="/s/_/favicon.ico" sizes="32x32">
+<link rel="icon" href="/s/_/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/s/_/apple-touch-icon.png">
 <link rel="stylesheet" href="${cssPath}">
 <script nonce="${nonce}">try { const t = localStorage.getItem('theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch {}</script>
 <style>${HOST_CSS}</style>
