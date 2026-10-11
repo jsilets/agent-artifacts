@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blobKey, ftsQuery, isSlug, isToken, newToken, pageChunks, parseMeta, parseTheme, plainText, route, thumbKey, withTheme } from './lib';
+import { blobKey, ftsQuery, isSlug, isToken, newToken, pageChunks, parseMeta, parseTheme, plainText, route, thumbKey, withKit, withTheme } from './lib';
 
 describe('isSlug', () => {
   it('takes <group>/<name>', () => {
@@ -70,6 +70,20 @@ describe('route', () => {
 
 it('blobKey puts each version under the slug', () => {
   expect(blobKey('g/n', 2)).toBe('pages/g/n/2.html');
+});
+
+describe('withKit', () => {
+  const page = (css: string) => `<html><head><style>\n${css}\n</style><style>.x{}</style></head><body>`;
+  it('swaps the packed kit for the current kit', () => {
+    expect(withKit(page('/* explain.css: old */ :root{--bg:#fff}'), '/* explain.css: new */')).toBe(page('/* explain.css: new */'));
+  });
+  it('keeps a page without the packed kit', () => {
+    const html = '<html><head><style>.x{}</style></head>';
+    expect(withKit(html, '/* explain.css: new */')).toBe(html);
+  });
+  it('keeps dollar signs in the CSS', () => {
+    expect(withKit(page('/* explain.css */'), '/* explain.css */ a::after{content:"$$"}')).toContain('"$$"');
+  });
 });
 
 describe('withTheme', () => {

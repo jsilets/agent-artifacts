@@ -5,7 +5,7 @@ import faviconSvg from '../../brand/mark-small.svg?raw';
 import faviconIco from '../../brand/favicon.ico?inline';
 import touchIcon from '../../brand/apple-touch-icon.png?inline';
 import { verifyAccessJwt, type Identity } from './auth';
-import { blobKey, claimId, type IconName, ftsQuery, newToken, pageChunks, parseMeta, parseTheme, route, thumbKey, withTheme, type Theme } from './lib';
+import { blobKey, claimId, type IconName, ftsQuery, newToken, pageChunks, parseMeta, parseTheme, route, thumbKey, withKit, withTheme, type Theme } from './lib';
 import { libraryHtml, messageHtml, sharedHtml, viewerHtml, type PageRow, type VersionRow } from './views';
 
 interface Env {
@@ -69,7 +69,8 @@ function withClaimIds(res: Response) {
 }
 
 async function rawPage(obj: R2ObjectBody, immutable: boolean, theme: Theme | null) {
-  const body = theme ? withTheme(await obj.text(), theme) : obj.body;
+  const html = withKit(await obj.text(), kitCss);
+  const body = theme ? withTheme(html, theme) : html;
   return withClaimIds(new Response(body, {
     headers: {
       ...BASE_HEADERS,
@@ -123,7 +124,7 @@ async function indexPage(env: Env, slug: string, title: string, html: string) {
 async function makeThumbs(env: Env, slug: string, version: number, html: string) {
   for (const theme of ['light', 'dark'] as const) {
     const res = await env.BROWSER.quickAction('screenshot', {
-      html: withTheme(html, theme),
+      html: withTheme(withKit(html, kitCss), theme),
       viewport: { width: 960, height: 600 },
       // The kit fades each block in. Stop that, so the shot shows the finished page.
       addStyleTag: [{ content: "*, *::before, *::after { animation: none !important; transition: none !important; }" }],

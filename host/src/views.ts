@@ -1,6 +1,18 @@
 // The host's own HTML: the library and the viewer. Pages never run in these documents.
 // A page runs only inside the sandboxed iframe, from the /raw or /s/<token>/raw route.
 
+import kitCss from '../../kit/explain.css?raw';
+
+/**
+ * A short hash of the kit. Pages and thumbnails are cached for a year, and the host builds both
+ * with the current kit, so their URLs carry this hash. A new kit gives new URLs.
+ */
+const KIT = (() => {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < kitCss.length; i++) h = Math.imul(h ^ kitCss.charCodeAt(i), 0x01000193);
+  return (h >>> 0).toString(36);
+})();
+
 export const esc = (s: string | number | null | undefined) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
@@ -312,7 +324,7 @@ export function libraryHtml(pages: PageRow[], nonce: string) {
   <a class="v-item" data-act="tab" target="_blank" rel="noopener">${icon('open')}Open in new tab</a>
 </div>
 <div class="v-toast" id="toast" role="status" hidden></div>
-<script type="application/json" id="data">${data({ pages, icons: { more: ICON.more, pin: ICON.pin, lock: ICON.lock, globe: ICON.globe } })}</script>`;
+<script type="application/json" id="data">${data({ pages, kit: KIT, icons: { more: ICON.more, pin: ICON.pin, lock: ICON.lock, globe: ICON.globe } })}</script>`;
 
   const script =
     COMMON_SCRIPT +
@@ -336,7 +348,7 @@ function ago(iso) {
   return d.toLocaleDateString([], { month: 'short', day: 'numeric', ...(d.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {}) });
 }
 const thumb = (p, sheets) => '<span class="h-thumb"' + (sheets ? ' data-sheets="' + sheets + '"' : '') + '>' + (p.thumb
-  ? ['light', 'dark'].map((t) => '<img class="h-img h-' + t + '" src="/t/' + p.slug + '/' + p.thumb + '/' + t + '.webp" alt="" loading="lazy" decoding="async">').join('')
+  ? ['light', 'dark'].map((t) => '<img class="h-img h-' + t + '" src="/t/' + p.slug + '/' + p.thumb + '/' + t + '.webp?k=' + D.kit + '" alt="" loading="lazy" decoding="async">').join('')
   : '<span class="h-ph">&lt;/&gt;</span>') + '</span>';
 const access = (p) => '<span class="h-acc" title="' + (p.shared ? 'Shared by link' : 'Only you') + '">' + svg(p.shared ? 'globe' : 'lock') + '</span>';
 const menu = (p) => '<button type="button" class="v-icon h-menu" aria-label="More for ' + h(p.title) + '" aria-expanded="false">' + svg('more') + '</button>';
@@ -575,7 +587,7 @@ function applyTheme() {
   $$('[data-theme-set]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.themeSet === theme)));
   if (!frame) return;
   // A search result links to /p/<slug>#claim-2. The hash goes to the frame, which scrolls to that claim.
-  const src = frame.dataset.src + (theme === 'auto' ? '' : '?theme=' + theme) + location.hash;
+  const src = frame.dataset.src + (theme === 'auto' ? '' : '&theme=' + theme) + location.hash;
   if (frame.getAttribute('src') !== src) frame.src = src;
 }
 $$('[data-theme-set]').forEach((b) => b.addEventListener('click', () => {
@@ -624,8 +636,8 @@ export function viewerHtml(input: ViewerInput, nonce: string) {
   <div class="v-pop" id="pop-more" hidden>
     ${appearance()}
     <div class="v-hr"></div>
-    <a class="v-item" href="/raw/${esc(slug)}/${n}" target="_blank" rel="noopener">${icon('open')}Open in new tab</a>
-    <a class="v-item" href="/raw/${esc(slug)}/${n}" download="${esc(slug.replace('/', '-'))}-v${n}.html">${icon('download')}Download HTML</a>
+    <a class="v-item" href="/raw/${esc(slug)}/${n}?k=${KIT}" target="_blank" rel="noopener">${icon('open')}Open in new tab</a>
+    <a class="v-item" href="/raw/${esc(slug)}/${n}?k=${KIT}" download="${esc(slug.replace('/', '-'))}-v${n}.html">${icon('download')}Download HTML</a>
     <div class="v-hr"></div>
     <button type="button" class="v-item is-danger c-red" id="del">${icon('trash')}<span>Delete page</span></button>
   </div>
@@ -640,7 +652,7 @@ export function viewerHtml(input: ViewerInput, nonce: string) {
     <ul class="v-links" id="links"></ul>
   </div>
 </header>
-<iframe class="v-frame" title="${esc(title)}" sandbox="${SANDBOX}" data-src="/raw/${esc(slug)}/${n}"></iframe>
+<iframe class="v-frame" title="${esc(title)}" sandbox="${SANDBOX}" data-src="/raw/${esc(slug)}/${n}?k=${KIT}"></iframe>
 </div>
 <div class="v-toast" id="toast" role="status" hidden></div>
 <script type="application/json" id="data">${data({ slug, version: n, followsLatest: input.followsLatest, icons: { link: ICON.link, check: ICON.check, x: ICON.x } })}</script>`;
@@ -711,7 +723,7 @@ $('#create').addEventListener('click', async (e) => {
 }
 
 export function sharedHtml(input: { token: string; title: string; repo: string | null; version: VersionRow }, nonce: string) {
-  const raw = `/s/${esc(input.token)}/raw`;
+  const raw = `/s/${esc(input.token)}/raw?k=${KIT}`;
   const body = `<div class="v">
 <header class="v-bar">
   <div class="v-crumb"><span class="v-title">${esc(input.title)}</span></div>

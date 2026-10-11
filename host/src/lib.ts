@@ -122,6 +122,16 @@ export function withTheme(html: string, theme: Theme): string {
   return html.replace(/<html\b([^>]*)>/i, (_, attrs: string) => `<html${attrs.replace(/\s+data-theme\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/i, '')} data-theme="${theme}">`);
 }
 
+/**
+ * A packed page carries the kit CSS from the day it was published. This swaps in the current kit,
+ * so old pages and their thumbnails show the current look. A page without the packed kit is unchanged.
+ */
+export function withKit(html: string, css: string): string {
+  const start = html.indexOf('<style>\n/* explain.css');
+  const end = start < 0 ? -1 : html.indexOf('</style>', start);
+  return end < 0 ? html : html.slice(0, start) + '<style>\n' + css + '\n' + html.slice(end);
+}
+
 // ─── Search ─────────────────────────────────────────────────────────
 
 /**
