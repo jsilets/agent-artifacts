@@ -46,7 +46,7 @@ button { font-family: var(--sans); }
 .v-frame { flex: 1; display: block; width: 100%; border: 0; background: var(--bg); }
 
 .v-icon { position: relative; flex: none; display: inline-grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--s); cursor: pointer; text-decoration: none; }
-.v-icon:hover, .v-icon[aria-expanded="true"] { background: var(--bg2); color: var(--p); }
+.v-icon:hover, .v-icon[aria-expanded="true"] { background: var(--bg2); color: var(--p); text-decoration: none; }
 svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 .v-icon.is-done { color: var(--ink); }
 
@@ -54,7 +54,7 @@ svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width:
 .v-ver { flex: none; display: inline-flex; align-items: center; height: 28px; margin-right: 4px; padding: 0 2px; border: 0.5px solid var(--b2); border-radius: 999px; font: 500 12px var(--mono); color: var(--s); }
 .v-ver.is-old { background: var(--fill); border-color: var(--line); color: var(--ink); }
 .v-step { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 999px; color: inherit; }
-.v-step:hover { background: var(--bg2); }
+.v-step:hover { background: var(--bg2); text-decoration: none; }
 .v-ver.is-old .v-step:hover { background: color-mix(in srgb, var(--line) 18%, transparent); }
 .v-step[aria-disabled="true"] { opacity: 0.3; pointer-events: none; }
 .v-step svg { width: 14px; height: 14px; }
@@ -84,17 +84,16 @@ svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width:
 @keyframes v-pop { from { opacity: 0; transform: translateY(-4px) scale(0.98); } }
 .v-label { padding: 8px 10px 6px; font: 500 11.5px var(--sans); color: var(--t); }
 .v-item { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 34px; padding: 6px 10px; box-sizing: border-box; border: 0; border-radius: 8px; background: transparent; color: var(--p); font: 500 13px var(--sans); text-align: left; text-decoration: none; cursor: pointer; }
-.v-item:hover, .v-item:focus-visible { background: var(--bg2); outline: none; }
+.v-item:hover, .v-item:focus-visible { background: var(--bg2); outline: none; text-decoration: none; }
 .v-item > svg { color: var(--s); }
 .v-item .v-meta { margin-left: auto; font: 12px var(--mono); color: var(--t); white-space: nowrap; }
 .v-item.is-danger, .v-item.is-danger > svg { color: var(--line); }
 .v-item.is-armed { background: var(--fill); }
 .v-hr { height: 0.5px; margin: 6px 4px; background: var(--b); }
 
-.v-vitem .v-mark { width: 16px; display: grid; place-items: center; color: var(--p); }
-.v-vitem .v-mark svg { visibility: hidden; }
-.v-vitem[aria-current="page"] .v-mark svg { visibility: visible; }
-.v-vitem .v-num { font: 600 12.5px var(--mono); min-width: 28px; }
+.v-vitem .v-num { font: 500 12.5px var(--mono); min-width: 28px; color: var(--s); }
+.v-vitem[aria-current="page"] { background: var(--bg2); }
+.v-vitem[aria-current="page"] .v-num { font-weight: 600; color: var(--p); }
 .v-tag { padding: 2px 7px; border-radius: 999px; background: var(--bg2); font: 500 11px var(--sans); color: var(--s); }
 
 .v-seg { display: flex; gap: 2px; margin: 0 4px 4px; padding: 2px; border-radius: 9px; background: var(--bg2); }
@@ -314,7 +313,7 @@ export function viewerHtml(input: ViewerInput, nonce: string) {
   const versionItems = versions
     .map(
       (v) => `<a class="v-item v-vitem" href="${href(v.version)}"${v.version === n ? ' aria-current="page"' : ''}>
-        <span class="v-mark">${icon('check')}</span><span class="v-num">v${v.version}</span>
+        <span class="v-num">v${v.version}</span>
         ${v.version === latest ? '<span class="v-tag">Latest</span>' : ''}
         <span class="v-meta">${esc(shortDay(v.created_at))}${v.sha ? ` · ${esc(v.sha)}` : ''}</span></a>`,
     )
