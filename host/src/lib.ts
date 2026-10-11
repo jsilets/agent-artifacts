@@ -57,6 +57,7 @@ export type Route =
   | { kind: 'view'; slug: string; version: number | null }
   | { kind: 'raw'; slug: string; version: number }
   | { kind: 'kit-css' }
+  | { kind: 'share-css' }
   | { kind: 'api-list' }
   | { kind: 'api-page'; slug: string }
   | { kind: 'api-shares'; slug: string }
@@ -74,6 +75,7 @@ export function route(path: string): Route {
   const ok = isSlug(slug);
   if (path === '/') return { kind: 'library' };
   if (path === '/_/explain.css') return { kind: 'kit-css' };
+  if (path === '/s/_/explain.css') return { kind: 'share-css' };
   if (p[0] === 'p' && ok && p.length === 3) return { kind: 'view', slug, version: null };
   if (p[0] === 'p' && ok && p.length === 5 && p[3] === 'v' && NUM.test(p[4])) return { kind: 'view', slug, version: +p[4] };
   if (p[0] === 'raw' && ok && p.length === 4 && NUM.test(p[3])) return { kind: 'raw', slug, version: +p[3] };

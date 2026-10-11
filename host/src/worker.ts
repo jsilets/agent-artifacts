@@ -161,11 +161,15 @@ async function handle(req: Request, env: Env): Promise<Response> {
   const nonce = newToken();
   const method = req.method;
 
+  const css = () => new Response(kitCss, { headers: { ...BASE_HEADERS, 'content-type': 'text/css; charset=utf-8', 'cache-control': 'public, max-age=300' } });
+  // The kit CSS is public, so a share link can load it with no login.
+  if (r.kind === 'share-css') return css();
+
   // Share links: Access lets /s/* through with no login, so the token is the only check.
   if (r.kind === 'share-view' || r.kind === 'share-raw') {
     if (method !== 'GET') return fail(405, 'method not allowed');
     const hit = await resolveShare(env, r.token);
-    if (!hit) return page(messageHtml('Link not found', 'This share link does not exist or was revoked.', nonce), nonce, 404);
+    if (!hit) return page(messageHtml('Link not found', 'This share link does not exist or was revoked.', nonce, '/s/_/explain.css'), nonce, 404);
     if (r.kind === 'share-view') return page(sharedHtml({ token: r.token, title: hit.page.title, repo: hit.page.repo, version: hit.version }, nonce), nonce);
     const obj = await env.PAGES.get(blobKey(hit.page.slug, hit.version.version));
     return obj ? rawPage(obj.body, false) : fail(404, 'no such version');
@@ -183,7 +187,7 @@ async function handle(req: Request, env: Env): Promise<Response> {
 
   switch (r.kind) {
     case 'kit-css':
-      return new Response(kitCss, { headers: { ...BASE_HEADERS, 'content-type': 'text/css; charset=utf-8', 'cache-control': 'private, max-age=300' } });
+      return css();
     case 'library': {
       const { results } = await env.DB.prepare('SELECT slug, title, repo, latest, updated_at FROM pages ORDER BY updated_at DESC').all<PageRow>();
       return page(libraryHtml(results, nonce), nonce);

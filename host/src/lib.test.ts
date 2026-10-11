@@ -56,6 +56,7 @@ describe('route', () => {
     expect(route(`/s/${t}`)).toEqual({ kind: 'share-view', token: t });
     expect(route(`/s/${t}/raw`)).toEqual({ kind: 'share-raw', token: t });
     expect(route('/_/explain.css')).toEqual({ kind: 'kit-css' });
+    expect(route('/s/_/explain.css')).toEqual({ kind: 'share-css' });
   });
   it('refuses bad slugs, versions and tokens', () => {
     for (const p of ['/p/g', '/p/G/n', '/p/g/n/v/0', '/p/g/n/v/x', '/raw/g/n', '/raw/g/n/01', '/s/short', '/s/' + t + '/x', '/api/pages/g/n/x'])

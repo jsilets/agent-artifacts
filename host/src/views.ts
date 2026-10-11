@@ -39,14 +39,14 @@ button:hover { background: var(--bg2); }
 .h-empty { color: var(--s); margin-top: 24px; }
 `;
 
-function shell(title: string, nonce: string, body: string, script = '') {
+function shell(title: string, nonce: string, body: string, script = '', cssPath = '/_/explain.css') {
   return `<!doctype html>
 <html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>${esc(title)}</title>
-<link rel="stylesheet" href="/_/explain.css">
+<link rel="stylesheet" href="${cssPath}">
 <style>${HOST_CSS}</style>
 <body>
 ${body}
@@ -178,9 +178,9 @@ export function sharedHtml(input: { token: string; title: string; repo: string |
   <div class="h-grow"><span class="h-title">${esc(input.title)}</span><p class="k-stamp">${stamp(input.repo, input.version)}</p></div>
 </header>
 <iframe class="h-frame" title="${esc(input.title)}" sandbox="${SANDBOX}" src="/s/${esc(input.token)}/raw"></iframe>`;
-  return shell(input.title, nonce, body);
+  return shell(input.title, nonce, body, '', '/s/_/explain.css');
 }
 
-export function messageHtml(title: string, text: string, nonce: string) {
-  return shell(title, nonce, `<main class="h-lib"><h1>${esc(title)}</h1><p class="h-empty">${esc(text)}</p></main>`);
+export function messageHtml(title: string, text: string, nonce: string, cssPath?: string) {
+  return shell(title, nonce, `<main class="h-lib"><h1>${esc(title)}</h1><p class="h-empty">${esc(text)}</p></main>`, "", cssPath);
 }
