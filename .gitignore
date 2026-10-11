@@ -7,3 +7,4 @@ node_modules/
 .env*
 # The deploy profile holds personal values: hostname, account, Access AUD, email.
 host/deploy.local.json
+.cloudflare/

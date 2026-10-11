@@ -1,0 +1,5 @@
+{
+  "hostname": "pages.example.com",
+  "accessTeam": "your-team",
+  "accessAud": "the AUD tag of the main Access application"
+}
