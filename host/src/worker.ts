@@ -2,7 +2,7 @@
 // and serves share links. See ../README.md for the routes and the auth model.
 import kitCss from '../../kit/explain.css?raw';
 import { verifyAccessJwt, type Identity } from './auth';
-import { blobKey, newToken, parseMeta, route } from './lib';
+import { blobKey, newToken, parseMeta, parseTheme, route, withTheme, type Theme } from './lib';
 import { libraryHtml, messageHtml, sharedHtml, viewerHtml, type PageRow, type VersionRow } from './views';
 
 interface Env {
@@ -51,7 +51,8 @@ function page(html: string, nonce: string, status = 200) {
   });
 }
 
-function rawPage(body: ReadableStream, immutable: boolean) {
+async function rawPage(obj: R2ObjectBody, immutable: boolean, theme: Theme | null) {
+  const body = theme ? withTheme(await obj.text(), theme) : obj.body;
   return new Response(body, {
     headers: {
       ...BASE_HEADERS,
@@ -160,6 +161,8 @@ async function handle(req: Request, env: Env): Promise<Response> {
   const r = route(url.pathname);
   const nonce = newToken();
   const method = req.method;
+  // The viewer asks for ?theme=light or ?theme=dark when the reader picks a theme.
+  const theme = parseTheme(url.searchParams.get('theme'));
 
   const css = () => new Response(kitCss, { headers: { ...BASE_HEADERS, 'content-type': 'text/css; charset=utf-8', 'cache-control': 'public, max-age=300' } });
   // The kit CSS is public, so a share link can load it with no login.
@@ -172,7 +175,7 @@ async function handle(req: Request, env: Env): Promise<Response> {
     if (!hit) return page(messageHtml('Link not found', 'This share link does not exist or was revoked.', nonce, '/s/_/explain.css'), nonce, 404);
     if (r.kind === 'share-view') return page(sharedHtml({ token: r.token, title: hit.page.title, repo: hit.page.repo, version: hit.version }, nonce), nonce);
     const obj = await env.PAGES.get(blobKey(hit.page.slug, hit.version.version));
-    return obj ? rawPage(obj.body, false) : fail(404, 'no such version');
+    return obj ? rawPage(obj, false, theme) : fail(404, 'no such version');
   }
 
   const who = await identify(req, env);
@@ -202,7 +205,7 @@ async function handle(req: Request, env: Env): Promise<Response> {
     }
     case 'raw': {
       const obj = await env.PAGES.get(blobKey(r.slug, r.version));
-      return obj ? rawPage(obj.body, true) : fail(404, 'no such version');
+      return obj ? rawPage(obj, true, theme) : fail(404, 'no such version');
     }
     case 'api-list': {
       if (method !== 'GET') return fail(405, 'method not allowed');

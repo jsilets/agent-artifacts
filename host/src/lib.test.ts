@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blobKey, isSlug, isToken, newToken, parseMeta, route } from './lib';
+import { blobKey, isSlug, isToken, newToken, parseMeta, parseTheme, route, withTheme } from './lib';
 
 describe('isSlug', () => {
   it('takes <group>/<name>', () => {
@@ -66,4 +66,19 @@ describe('route', () => {
 
 it('blobKey puts each version under the slug', () => {
   expect(blobKey('g/n', 2)).toBe('pages/g/n/2.html');
+});
+
+describe('withTheme', () => {
+  it('adds data-theme to the html tag', () => {
+    expect(withTheme('<!doctype html>\n<html lang="en" class="no-js"><body>', 'dark')).toBe('<!doctype html>\n<html lang="en" class="no-js" data-theme="dark"><body>');
+  });
+  it('replaces a data-theme that the page already has', () => {
+    expect(withTheme('<html data-theme="dark" data-host="inline">', 'light')).toBe('<html data-host="inline" data-theme="light">');
+  });
+  it('accepts only light and dark', () => {
+    expect(parseTheme('light')).toBe('light');
+    expect(parseTheme('dark')).toBe('dark');
+    expect(parseTheme('auto')).toBe(null);
+    expect(parseTheme(null)).toBe(null);
+  });
 });

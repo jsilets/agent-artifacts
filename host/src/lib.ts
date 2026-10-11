@@ -93,3 +93,12 @@ export function route(path: string): Route {
 
 /** The R2 key of one stored version. */
 export const blobKey = (slug: string, version: number) => `pages/${slug}/${version}.html`;
+
+export type Theme = 'light' | 'dark';
+
+export const parseTheme = (v: string | null): Theme | null => (v === 'light' || v === 'dark' ? v : null);
+
+/** Sets data-theme on the page's <html> tag, so the kit draws that theme whatever the OS uses. */
+export function withTheme(html: string, theme: Theme): string {
+  return html.replace(/<html\b([^>]*)>/i, (_, attrs: string) => `<html${attrs.replace(/\s+data-theme\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/i, '')} data-theme="${theme}">`);
+}

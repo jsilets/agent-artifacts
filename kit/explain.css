@@ -39,7 +39,9 @@
     --link: #85B7EB;
   }
 }
+:root[data-theme="light"] { color-scheme: light; }
 :root[data-theme="dark"] {
+  color-scheme: dark;
   --bg: #1a1a18; --bg2: #2c2c2a; --bg3: #222220;
   --p: #e8e6de; --s: #9c9a92; --t: #73726c;
   --b: rgba(255, 255, 255, 0.14); --b2: rgba(255, 255, 255, 0.35); --link: #85B7EB;

@@ -47,6 +47,7 @@ function shell(title: string, nonce: string, body: string, script = '', cssPath 
 <meta name="robots" content="noindex">
 <title>${esc(title)}</title>
 <link rel="stylesheet" href="${cssPath}">
+<script nonce="${nonce}">try { const t = localStorage.getItem('theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch {}</script>
 <style>${HOST_CSS}</style>
 <body>
 ${body}
@@ -115,6 +116,25 @@ export interface ViewerInput {
   followsLatest: boolean;
 }
 
+/** Cycles the theme: auto (follow the OS), light, dark. The frame reloads with ?theme= so the page draws it. */
+const THEME_SCRIPT = `
+const frame = document.querySelector('iframe');
+const btn = document.getElementById('theme');
+const NAMES = { auto: 'Theme: auto', light: 'Theme: light', dark: 'Theme: dark' };
+let theme = 'auto';
+try { theme = localStorage.getItem('theme') || 'auto'; } catch {}
+function apply() {
+  if (theme === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = theme;
+  btn.textContent = NAMES[theme] || NAMES.auto;
+  frame.src = frame.dataset.src + (theme === 'auto' ? '' : '?theme=' + theme);
+}
+btn.addEventListener('click', () => {
+  theme = { auto: 'light', light: 'dark', dark: 'auto' }[theme] || 'auto';
+  try { if (theme === 'auto') localStorage.removeItem('theme'); else localStorage.setItem('theme', theme); } catch {}
+  apply();
+});
+apply();`;
+
 const SANDBOX = 'allow-scripts allow-popups allow-popups-to-escape-sandbox';
 
 function stamp(repo: string | null, v: VersionRow) {
@@ -130,6 +150,7 @@ export function viewerHtml(input: ViewerInput, nonce: string) {
   <a href="/" title="All pages">Artifacts</a>
   <div class="h-grow"><span class="h-title">${esc(title)}</span><p class="k-stamp">${stamp(repo, version)}</p></div>
   <select id="ver" aria-label="Version">${options}</select>
+  <button id="theme" title="Follow the OS, or force light or dark">Theme: auto</button>
   <button id="copy">Copy link</button>
   <button id="share" aria-expanded="false">Share</button>
 </header>
@@ -141,9 +162,9 @@ export function viewerHtml(input: ViewerInput, nonce: string) {
   <ul id="shares"></ul>
   <button class="h-danger c-red" id="del">Delete this page and all versions</button>
 </div>
-<iframe class="h-frame" title="${esc(title)}" sandbox="${SANDBOX}" src="/raw/${esc(slug)}/${version.version}"></iframe>
+<iframe class="h-frame" title="${esc(title)}" sandbox="${SANDBOX}" data-src="/raw/${esc(slug)}/${version.version}"></iframe>
 <script type="application/json" id="data">${data({ slug, version: version.version, followsLatest: input.followsLatest })}</script>`;
-  const script = `
+  const script = THEME_SCRIPT + `
 const D = JSON.parse(document.getElementById('data').textContent);
 const $ = (id) => document.getElementById(id);
 const api = (path, init = {}) => fetch(path, { ...init, headers: { 'content-type': 'application/json', ...(init.headers || {}) } }).then(async (r) => { if (!r.ok) throw new Error(await r.text()); return r.status === 204 ? null : r.json(); });
@@ -176,9 +197,10 @@ $('del').addEventListener('click', async () => { if (confirm('Delete ' + D.slug 
 export function sharedHtml(input: { token: string; title: string; repo: string | null; version: VersionRow }, nonce: string) {
   const body = `<header class="h-bar">
   <div class="h-grow"><span class="h-title">${esc(input.title)}</span><p class="k-stamp">${stamp(input.repo, input.version)}</p></div>
+  <button id="theme" title="Follow the OS, or force light or dark">Theme: auto</button>
 </header>
-<iframe class="h-frame" title="${esc(input.title)}" sandbox="${SANDBOX}" src="/s/${esc(input.token)}/raw"></iframe>`;
-  return shell(input.title, nonce, body, '', '/s/_/explain.css');
+<iframe class="h-frame" title="${esc(input.title)}" sandbox="${SANDBOX}" data-src="/s/${esc(input.token)}/raw"></iframe>`;
+  return shell(input.title, nonce, body, THEME_SCRIPT, '/s/_/explain.css');
 }
 
 export function messageHtml(title: string, text: string, nonce: string, cssPath?: string) {
