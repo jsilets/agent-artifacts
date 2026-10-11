@@ -8,7 +8,7 @@ The repo has four parts:
 |---|---|
 | `skills/explain/` | The `explain` skill. It tells an agent how to choose the content of a page, which figure to use for each claim, and how to write the words. |
 | `kit/` | `explain.css` and `explain.js`: the look and the runtime that every page shares. |
-| `brand/` | The mark. `mark.svg` is the master, `mark-small.svg` is the cut for 16 to 32 px (the favicon), and `mark-square.svg` is for platforms that round the corners. `favicon.ico` and `apple-touch-icon.png` are rendered from them. |
+| `brand/` | The mark. `mark.svg` is the master, `mark-small.svg` is the cut for 16 to 32 px with thicker parts and a bolder heading line (the favicon), and `mark-square.svg` is for platforms that round the corners. `favicon.ico` and `apple-touch-icon.png` are rendered from them. |
 | `cli/` | `agent-pages`: `new`, `check`, `pack`, `serve`, `publish` and `list`. Node 18 or later, no dependencies. |
 | `host/` | A Cloudflare Worker: the library, the viewer, the API and the share links. |
 
