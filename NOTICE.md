@@ -15,7 +15,7 @@ This project contains code and design values from these projects.
 - License: the repository's LICENSE file is Apache License 2.0. The plugin's `plugin.json` says MIT. This notice follows the Apache 2.0 terms.
 - Used in: `kit/explain.js`, the code between the "From html-plan" and "End of html-plan code" markers: `takeMark`, `parseFlow` and `layoutFlow`.
 - Changes: `TONES` uses this kit's color ramps. `parseFlow` and `layoutFlow` are local constants instead of properties of a namespace. The SVG drawing code and everything else in the file are new.
-- Ideas, not code: claims that can be true or false, one exhibit for each claim, and the STE word list in `cli/agent-artifacts.mjs`.
+- Ideas, not code: claims that can be true or false, one exhibit for each claim, and the STE word list in `cli/agent-pages.mjs`.
 
 ## visual-explainer
 

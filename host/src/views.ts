@@ -193,9 +193,9 @@ export function libraryHtml(pages: PageRow[], nonce: string) {
     )
     .join('');
   const body = `<main class="h-lib">
-<h1>Artifacts</h1>
+<h1>Pages</h1>
 <input id="q" type="search" placeholder="Filter by title" autocomplete="off" autofocus>
-${list || '<p class="h-empty">No pages yet. Publish one with <code>agent-artifacts publish &lt;page&gt;</code>.</p>'}
+${list || '<p class="h-empty">No pages yet. Publish one with <code>agent-pages publish &lt;page&gt;</code>.</p>'}
 </main>`;
   const script = `
 const q = document.getElementById('q');
@@ -207,7 +207,7 @@ q.addEventListener('input', () => {
     s.hidden = !any;
   });
 });`;
-  return shell('Artifacts', nonce, body, script);
+  return shell('Pages', nonce, body, script);
 }
 
 export interface VersionRow {

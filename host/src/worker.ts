@@ -1,4 +1,4 @@
-// agent-artifacts: stores HTML pages with versions, shows them in a sandboxed viewer,
+// agent-pages: stores HTML pages with versions, shows them in a sandboxed viewer,
 // and serves share links. See ../README.md for the routes and the auth model.
 import kitCss from '../../kit/explain.css?raw';
 import { verifyAccessJwt, type Identity } from './auth';

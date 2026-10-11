@@ -1,5 +1,5 @@
 /**
- * The agent-artifacts Worker, deployed with `cf deploy`.
+ * The agent-pages Worker, deployed with `cf deploy`.
  *
  * `--mode production` evaluates the deployed Worker. Any other mode evaluates
  * `development`, which runs with local D1 and R2 and no Access check.
@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { bindings, defineConfig } from 'cf/config';
 import type { ConfigContext } from 'cf/config';
 
-const NAME = 'agent-artifacts';
+const NAME = 'agent-pages';
 
 /** The ID of the local D1 simulator database. It names no Cloudflare database. */
 const LOCAL_D1_ID = '00000000-0000-4000-8000-00000000a271';
@@ -26,6 +26,8 @@ interface DeployProfile {
   accessTeam: string;
   /** The Application Audience (AUD) tag of the main Access application. */
   accessAud: string;
+  /** Optional. The name of the Worker, the D1 database and the R2 bucket. Default: `agent-pages`. */
+  name?: string;
 }
 
 function readProfile(): DeployProfile {
@@ -36,10 +38,11 @@ function readProfile(): DeployProfile {
 
 export default defineConfig(({ mode }: ConfigContext) => {
   const production = mode === 'production';
-  const profile = production ? readProfile() : { hostname: '', accessTeam: '', accessAud: '' };
+  const profile: DeployProfile = production ? readProfile() : { hostname: '', accessTeam: '', accessAud: '' };
+  const name = profile.name || NAME;
   return {
     worker: {
-      name: production ? NAME : `${NAME}-development`,
+      name: production ? name : `${NAME}-development`,
       entrypoint: './src/worker.ts',
       compatibilityDate: '2026-08-30',
       observability: { enabled: true },
@@ -48,8 +51,8 @@ export default defineConfig(({ mode }: ConfigContext) => {
       workersDev: false,
       ...(production ? { domains: [profile.hostname] } : {}),
       env: {
-        DB: bindings.d1(production ? { name: NAME } : { name: `${NAME}-development`, id: LOCAL_D1_ID }),
-        PAGES: bindings.r2({ name: production ? NAME : `${NAME}-development` }),
+        DB: bindings.d1(production ? { name } : { name: `${NAME}-development`, id: LOCAL_D1_ID }),
+        PAGES: bindings.r2({ name: production ? name : `${NAME}-development` }),
         ENVIRONMENT: bindings.text(production ? 'production' : 'development'),
         ACCESS_TEAM: bindings.text(profile.accessTeam),
         ACCESS_AUD: bindings.text(profile.accessAud),

@@ -1,13 +1,13 @@
 #!/usr/bin/env node
-// agent-artifacts: make, check, pack and publish explain pages. Node 18+, no dependencies.
+// agent-pages: make, check, pack and publish explain pages. Node 18+, no dependencies.
 //
-//   agent-artifacts new <slug> [--title "Title"] [--dir <out dir>]   write a page skeleton, print its path
-//   agent-artifacts check <page.html>                                 lint; exit 1 on errors
-//   agent-artifacts pack <page.html> [-o out.html] [--inline]          lint, then inline the kit into one file
-//   agent-artifacts serve <page.html> [--port 8765]                    serve the page's folder on 127.0.0.1, print the URL
-//   agent-artifacts publish <page.html> [--slug g/n] [--share] [--json] send the page to the host, print its URL
+//   agent-pages new <slug> [--title "Title"] [--dir <out dir>]   write a page skeleton, print its path
+//   agent-pages check <page.html>                                 lint; exit 1 on errors
+//   agent-pages pack <page.html> [-o out.html] [--inline]          lint, then inline the kit into one file
+//   agent-pages serve <page.html> [--port 8765]                    serve the page's folder on 127.0.0.1, print the URL
+//   agent-pages publish <page.html> [--slug g/n] [--share] [--json] send the page to the host, print its URL
 //
-// publish reads AGENT_ARTIFACTS_URL, AGENT_ARTIFACTS_CLIENT_ID and AGENT_ARTIFACTS_CLIENT_SECRET.
+// publish reads AGENT_PAGES_URL, AGENT_PAGES_CLIENT_ID and AGENT_PAGES_CLIENT_SECRET.
 //
 // --inline marks the page for an inline host (T3 Code html_render): it gets less padding.
 
@@ -36,7 +36,7 @@ function read(p) { if (!p || !existsSync(p)) { console.error(`no such file: ${p}
 function cmdNew() {
   const title = flag('--title'), dir = flag('--dir');
   const slug = (rest[0] || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  if (!slug) { console.error('give a slug: agent-artifacts new engine-overview'); process.exit(2); }
+  if (!slug) { console.error('give a slug: agent-pages new engine-overview'); process.exit(2); }
   const top = git(['rev-parse', '--show-toplevel'], process.cwd());
   const repo = top ? basename(top) : basename(process.cwd());
   const sha = git(['rev-parse', '--short', 'HEAD'], process.cwd()) || 'no-git';
@@ -94,12 +94,12 @@ function defaultSlug(html, file) {
 async function cmdPublish() {
   const slugFlag = flag('--slug'), share = has('--share'), asJson = has('--json'), src = rest[0];
   const out = (code, obj, text) => { if (asJson) console.log(JSON.stringify(obj)); else console[code ? 'error' : 'log'](text); process.exit(code); };
-  if (!src) out(2, { error: 'usage' }, 'usage: agent-artifacts publish <page> [--slug group/name] [--share] [--json]');
-  const host = (process.env.AGENT_ARTIFACTS_URL || '').replace(/\/+$/, '');
-  const id = process.env.AGENT_ARTIFACTS_CLIENT_ID, secret = process.env.AGENT_ARTIFACTS_CLIENT_SECRET;
-  if (!host) out(3, { error: 'AGENT_ARTIFACTS_URL is not set' }, 'error: set AGENT_ARTIFACTS_URL to the host, for example https://pages.example.com');
+  if (!src) out(2, { error: 'usage' }, 'usage: agent-pages publish <page> [--slug group/name] [--share] [--json]');
+  const host = (process.env.AGENT_PAGES_URL || '').replace(/\/+$/, '');
+  const id = process.env.AGENT_PAGES_CLIENT_ID, secret = process.env.AGENT_PAGES_CLIENT_SECRET;
+  if (!host) out(3, { error: 'AGENT_PAGES_URL is not set' }, 'error: set AGENT_PAGES_URL to the host, for example https://pages.example.com');
   const local = /^http:\/\/(localhost|127\.0\.0\.1)(:|$)/.test(host);
-  if (!local && (!id || !secret)) out(3, { error: 'no service token' }, 'error: set AGENT_ARTIFACTS_CLIENT_ID and AGENT_ARTIFACTS_CLIENT_SECRET (a Cloudflare Access service token)');
+  if (!local && (!id || !secret)) out(3, { error: 'no service token' }, 'error: set AGENT_PAGES_CLIENT_ID and AGENT_PAGES_CLIENT_SECRET (a Cloudflare Access service token)');
 
   let html = read(src);
   if (!isPacked(html)) {
@@ -148,7 +148,7 @@ function lint(html, file) {
   } catch {}
 
   // Shape
-  if (!/<!--\s*SNAPSHOT:/.test(html)) err('missing the SNAPSHOT comment at the top. Start from "agent-artifacts new"');
+  if (!/<!--\s*SNAPSHOT:/.test(html)) err('missing the SNAPSHOT comment at the top. Start from "agent-pages new"');
   if (!/class="k-stamp"/.test(html)) err('missing the .k-stamp line under the h1');
   const stampText = html.match(/<p class="k-stamp"[^>]*>([\s\S]*?)<\/p>/i);
   if (stampText && /\b[0-9a-f]{7,40}\b/.test(stampText[1])) warn('the .k-stamp shows a commit hash. Readers do not need it; the SNAPSHOT comment keeps it for agents');
@@ -253,4 +253,4 @@ else if (cmd === 'check') process.exit(report(lint(read(rest[0]), rest[0])) ? 1 
 else if (cmd === 'pack') cmdPack();
 else if (cmd === 'serve') cmdServe();
 else if (cmd === 'publish') cmdPublish();
-else { console.error('usage: agent-artifacts new <slug> [--title T] [--dir D] | check <page> | pack <page> [-o out] [--inline] | serve <page> [--port N] | publish <page> [--slug S] [--share] [--json]'); process.exit(2); }
+else { console.error('usage: agent-pages new <slug> [--title T] [--dir D] | check <page> | pack <page> [-o out] [--inline] | serve <page> [--port N] | publish <page> [--slug S] [--share] [--json]'); process.exit(2); }

@@ -1,6 +1,6 @@
 /* explain.js: the runtime for explain pages. One file, no dependencies.
    It draws .k-flow diagrams, .k-dots scores, .k-model sliders, .k-steps and Mermaid blocks.
-   In Node (no DOM) it only sets globalThis.Explain, so cli/agent-artifacts.mjs can lint with the same parsers.
+   In Node (no DOM) it only sets globalThis.Explain, so cli/agent-pages.mjs can lint with the same parsers.
    The flow parser and layout (marked below) come from Anthropic's html-plan skill. See ../NOTICE.md. */
 (function () {
 'use strict';

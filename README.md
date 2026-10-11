@@ -1,6 +1,6 @@
-# agent-artifacts
+# agent-pages
 
-agent-artifacts lets coding agents make HTML pages that explain things with pictures, and keeps those pages on your own Cloudflare account. It works like Claude artifacts: each page has versions, a library lists every page, and a share link opens one page with no login.
+agent-pages lets coding agents make HTML pages that explain things with pictures, and keeps those pages on your own Cloudflare account. It works like Claude artifacts: each page has versions, a library lists every page, and a share link opens one page with no login.
 
 The repo has four parts:
 
@@ -8,7 +8,7 @@ The repo has four parts:
 |---|---|
 | `skills/explain/` | The `explain` skill. It tells an agent how to choose the content of a page, which figure to use for each claim, and how to write the words. |
 | `kit/` | `explain.css` and `explain.js`: the look and the runtime that every page shares. |
-| `cli/` | `agent-artifacts`: `new`, `check`, `pack`, `serve` and `publish`. Node 18 or later, no dependencies. |
+| `cli/` | `agent-pages`: `new`, `check`, `pack`, `serve` and `publish`. Node 18 or later, no dependencies. |
 | `host/` | A Cloudflare Worker: the library, the viewer, the API and the share links. |
 
 ## Install the skill and the CLI
@@ -20,11 +20,11 @@ The repo has four parts:
    ```
 2. Put the CLI on your `PATH`:
    ```bash
-   ln -s "$PWD/cli/agent-artifacts.mjs" ~/.local/bin/agent-artifacts
+   ln -s "$PWD/cli/agent-pages.mjs" ~/.local/bin/agent-pages
    ```
 3. Try it:
    ```bash
-   agent-artifacts check skills/explain/examples/gallery.html
+   agent-pages check skills/explain/examples/gallery.html
    ```
 
 Without a host, the skill still works. Pages go to `~/.agent/explain/<repo>/`, and the agent shows them inline or in a local preview.
@@ -60,12 +60,12 @@ You need a Cloudflare account, a zone for the hostname, and Cloudflare Zero Trus
    bun install
    bun run test
    ```
-2. Copy `deploy.example.json` to `deploy.local.json`, and set `hostname` and `accessTeam`. Leave `accessAud` empty for now. Git ignores `deploy.local.json`.
+2. Copy `deploy.example.json` to `deploy.local.json`, and set `hostname` and `accessTeam`. Leave `accessAud` empty for now. Git ignores `deploy.local.json`. An optional `name` sets the name of the Worker, the D1 database and the R2 bucket. The default is `agent-pages`.
 3. Create the storage and apply the migration:
    ```bash
    cf auth whoami                       # confirm the account
-   cf d1 create --name agent-artifacts
-   cf r2 buckets create --name agent-artifacts
+   cf d1 create --name agent-pages
+   cf r2 buckets create --name agent-pages
    bunx cf d1 migrations apply <database id> --dir migrations
    ```
 4. Build and deploy:
@@ -81,13 +81,13 @@ You need a Cloudflare account, a zone for the hostname, and Cloudflare Zero Trus
 6. Put the AUD tag of the first application in `deploy.local.json` as `accessAud`, then build and deploy again.
 7. Set these variables in your shell profile:
    ```bash
-   export AGENT_ARTIFACTS_URL=https://<hostname>
-   export AGENT_ARTIFACTS_CLIENT_ID=<service token client ID>
-   export AGENT_ARTIFACTS_CLIENT_SECRET=<service token client secret>
+   export AGENT_PAGES_URL=https://<hostname>
+   export AGENT_PAGES_CLIENT_ID=<service token client ID>
+   export AGENT_PAGES_CLIENT_SECRET=<service token client secret>
    ```
 8. Publish a page:
    ```bash
-   agent-artifacts publish skills/explain/examples/gallery.html --slug example/gallery
+   agent-pages publish skills/explain/examples/gallery.html --slug example/gallery
    ```
 
 To run the host locally, apply the migration to the local database and start Vite. Local mode has no Access check.
@@ -95,7 +95,7 @@ To run the host locally, apply the migration to the local database and start Vit
 ```bash
 bunx cf d1 migrations apply 00000000-0000-4000-8000-00000000a271 --local --persist-to .cloudflare/state --dir migrations
 bunx vite --port 8787
-AGENT_ARTIFACTS_URL=http://localhost:8787 agent-artifacts publish <page>
+AGENT_PAGES_URL=http://localhost:8787 agent-pages publish <page>
 ```
 
 ## License
