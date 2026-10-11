@@ -1,0 +1,35 @@
+{
+  "name": "agent-pages",
+  "version": "0.1.0",
+  "description": "Self-hosted artifacts for coding agents.",
+  "type": "module",
+  "bin": {
+    "agent-pages": "cli/agent-pages.mjs"
+  },
+  "files": [
+    "cli",
+    "kit",
+    "skills",
+    "NOTICE.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "author": "Josh Silets",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jsilets/agent-pages.git"
+  },
+  "homepage": "https://github.com/jsilets/agent-pages#readme",
+  "bugs": "https://github.com/jsilets/agent-pages/issues",
+  "keywords": [
+    "agents",
+    "claude-code",
+    "codex",
+    "agent-skills",
+    "artifacts",
+    "html",
+    "cloudflare-workers"
+  ]
+}

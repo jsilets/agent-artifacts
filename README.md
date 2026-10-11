@@ -18,8 +18,10 @@ The repo has four parts:
    ln -s "$PWD/skills/explain" ~/.claude/skills/explain
    ln -s "$PWD/skills/explain" ~/.codex/skills/explain
    ```
-2. Put the CLI on your `PATH`:
+2. Put the CLI on your `PATH`. Install it from npm, or link it from the clone:
    ```bash
+   npm install -g agent-pages
+   # or
    ln -s "$PWD/cli/agent-pages.mjs" ~/.local/bin/agent-pages
    ```
 3. Try it:
