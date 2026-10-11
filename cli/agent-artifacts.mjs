@@ -1,10 +1,13 @@
 #!/usr/bin/env node
-// agent-artifacts: make, check and pack explain pages. Node 18+, no dependencies.
+// agent-artifacts: make, check, pack and publish explain pages. Node 18+, no dependencies.
 //
 //   agent-artifacts new <slug> [--title "Title"] [--dir <out dir>]   write a page skeleton, print its path
 //   agent-artifacts check <page.html>                                 lint; exit 1 on errors
 //   agent-artifacts pack <page.html> [-o out.html] [--inline]          lint, then inline the kit into one file
 //   agent-artifacts serve <page.html> [--port 8765]                    serve the page's folder on 127.0.0.1, print the URL
+//   agent-artifacts publish <page.html> [--slug g/n] [--share] [--json] send the page to the host, print its URL
+//
+// publish reads AGENT_ARTIFACTS_URL, AGENT_ARTIFACTS_CLIENT_ID and AGENT_ARTIFACTS_CLIENT_SECRET.
 //
 // --inline marks the page for an inline host (T3 Code html_render): it gets less padding.
 
@@ -50,20 +53,78 @@ function cmdNew() {
   console.log(out);
 }
 
-function cmdPack() {
-  const out = flag('-o'), inline = has('--inline'), src = rest[0];
-  let html = read(src);
-  if (report(lint(html, src))) { console.error('pack stopped: fix the errors first'); process.exit(1); }
+/** Inlines the kit into the page, so the page is one self-contained file. */
+function packHtml(html, inline) {
   const css = readFileSync(join(KIT, 'explain.css'), 'utf8'), js = readFileSync(join(KIT, 'explain.js'), 'utf8');
   html = html.replace(/<link[^>]+href="[^"]*explain\.css"[^>]*>/, () => `<style>\n${css}\n</style>`)
     .replace(/<script[^>]+src="[^"]*explain\.js"[^>]*><\/script>/, '')
     .replace(/<\/body>/i, () => `<script>\n${js.replace(/<\/script/gi, '<\\/script')}\n</script>\n</body>`);
   if (inline) html = html.replace(/<html([^>]*)>/i, '<html$1 data-host="inline">');
+  return html;
+}
+
+const isPacked = (html) => !/<link[^>]+href="[^"]*explain\.css"/.test(html);
+
+function cmdPack() {
+  const out = flag('-o'), inline = has('--inline'), src = rest[0];
+  let html = read(src);
+  if (report(lint(html, src))) { console.error('pack stopped: fix the errors first'); process.exit(1); }
+  html = packHtml(html, inline);
   const bytes = Buffer.byteLength(html);
   if (bytes > MAX_BYTES) { console.error(`error: packed page is ${(bytes / 1024).toFixed(0)} KB; html_render takes 512 KB at most`); process.exit(1); }
   const dest = out || src.replace(/\.html$/, '') + '.packed.html';
   writeFileSync(dest, html);
   console.log(`${dest}  (${(bytes / 1024).toFixed(0)} KB)`);
+}
+
+// ─── Publish ────────────────────────────────────────────────────────
+// Exit codes: 0 done · 1 the page or the host refused · 2 usage · 3 no host or credentials.
+
+const slugPart = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64).replace(/-+$/, '');
+
+/** <repo>/<name>: the repo from the stamp or the folder, the name from the file without its date. */
+function defaultSlug(html, file) {
+  const stamp = html.match(/<p class="k-stamp"[^>]*>([\s\S]*?)<\/p>/i);
+  const repo = (stamp && strip(stamp[1]).split(' · ')[0]) || basename(dirname(resolve(file)));
+  const name = basename(file).replace(/(\.packed)?\.html?$/i, '').replace(/^\d{4}-\d{2}-\d{2}-/, '');
+  return `${slugPart(repo)}/${slugPart(name)}`;
+}
+
+async function cmdPublish() {
+  const slugFlag = flag('--slug'), share = has('--share'), asJson = has('--json'), src = rest[0];
+  const out = (code, obj, text) => { if (asJson) console.log(JSON.stringify(obj)); else console[code ? 'error' : 'log'](text); process.exit(code); };
+  if (!src) out(2, { error: 'usage' }, 'usage: agent-artifacts publish <page> [--slug group/name] [--share] [--json]');
+  const host = (process.env.AGENT_ARTIFACTS_URL || '').replace(/\/+$/, '');
+  const id = process.env.AGENT_ARTIFACTS_CLIENT_ID, secret = process.env.AGENT_ARTIFACTS_CLIENT_SECRET;
+  if (!host) out(3, { error: 'AGENT_ARTIFACTS_URL is not set' }, 'error: set AGENT_ARTIFACTS_URL to the host, for example https://pages.example.com');
+  const local = /^http:\/\/(localhost|127\.0\.0\.1)(:|$)/.test(host);
+  if (!local && (!id || !secret)) out(3, { error: 'no service token' }, 'error: set AGENT_ARTIFACTS_CLIENT_ID and AGENT_ARTIFACTS_CLIENT_SECRET (a Cloudflare Access service token)');
+
+  let html = read(src);
+  if (!isPacked(html)) {
+    const r = lint(html, src);
+    if (report(r)) out(1, { error: 'check failed', errors: r.errs }, 'publish stopped: fix the errors first');
+    html = packHtml(html, false);
+  }
+  const slug = slugFlag || defaultSlug(html, src);
+  if (!/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?\/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/.test(slug)) out(2, { error: 'bad slug', slug }, `error: the slug "${slug}" must be group/name in lowercase letters, digits and hyphens`);
+
+  const auth = id && secret ? { 'CF-Access-Client-Id': id, 'CF-Access-Client-Secret': secret } : {};
+  const call = async (method, path, body, type) => {
+    let res;
+    try { res = await fetch(host + path, { method, body, redirect: 'manual', headers: { ...auth, ...(type ? { 'content-type': type } : {}) } }); }
+    catch (e) { out(1, { error: 'network', message: String(e.cause?.message || e.message) }, `error: cannot reach ${host}: ${e.cause?.message || e.message}`); }
+    // Access answers a request it did not let through with a redirect to its login page.
+    if (res.status >= 300 && res.status < 400 || res.status === 401 || res.status === 403) out(3, { error: 'access refused', status: res.status }, `error: Access refused the request (${res.status}). Check the service token and the Access policy.`);
+    const text = await res.text();
+    let data; try { data = JSON.parse(text); } catch { data = { error: text.slice(0, 200) }; }
+    if (!res.ok) out(1, { error: data.error || 'host error', status: res.status }, `error: the host answered ${res.status}: ${data.error || text.slice(0, 200)}`);
+    return data;
+  };
+  const page = await call('PUT', `/api/pages/${slug}`, html, 'text/html; charset=utf-8');
+  const result = { slug: page.slug, version: page.version, url: page.url, versionUrl: page.versionUrl };
+  if (share) result.shareUrl = (await call('POST', `/api/pages/${slug}/shares`, JSON.stringify({ version: 'latest' }), 'application/json')).url;
+  out(0, result, [`${page.url}  (v${page.version})`, result.shareUrl && `share: ${result.shareUrl}`].filter(Boolean).join('\n'));
 }
 
 // ─── Lint ───────────────────────────────────────────────────────────
@@ -188,4 +249,5 @@ if (cmd === 'new') cmdNew();
 else if (cmd === 'check') process.exit(report(lint(read(rest[0]), rest[0])) ? 1 : 0);
 else if (cmd === 'pack') cmdPack();
 else if (cmd === 'serve') cmdServe();
-else { console.error('usage: agent-artifacts new <slug> [--title T] [--dir D] | check <page> | pack <page> [-o out] [--inline] | serve <page> [--port N]'); process.exit(2); }
+else if (cmd === 'publish') cmdPublish();
+else { console.error('usage: agent-artifacts new <slug> [--title T] [--dir D] | check <page> | pack <page> [-o out] [--inline] | serve <page> [--port N] | publish <page> [--slug S] [--share] [--json]'); process.exit(2); }
