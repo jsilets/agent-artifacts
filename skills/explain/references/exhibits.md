@@ -9,7 +9,7 @@ Color ramps: `c-gray c-purple c-teal c-coral c-pink c-blue c-green c-amber c-red
 ```html
 <header>
   <h1>How the engine moves data</h1>                  <!-- a title, 3 to 7 words -->
-  <p class="k-stamp">repo · snapshot · Oct 10, 2026</p> <!-- "new" fills it in -->
+  <p class="k-stamp">repo · Oct 10, 2026</p> <!-- "new" fills it in -->
   <p class="k-lede">The answer in one sentence.</p>
 </header>
 <section class="k-claim">
