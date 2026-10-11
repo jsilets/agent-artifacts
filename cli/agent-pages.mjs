@@ -144,7 +144,7 @@ async function cmdList() {
   const call = hostClient(out);
   if (query) {
     const hits = (await call('GET', `/api/search?q=${encodeURIComponent(query)}`)).map((h) => ({ slug: h.slug, title: h.title, repo: h.repo, heading: h.heading, snippet: h.snippet.replace(/[\u0002\u0003]/g, ''), url: h.url }));
-    out(0, hits, hits.length ? hits.map((h) => [`${h.title}  (${h.slug})`, h.heading && `  ${h.heading}`, `  ${h.snippet}`, `  ${h.url}`].filter(Boolean).join('\n')).join('\n\n') : `no page matches "${query}"`);
+    out(0, hits, hits.length ? hits.map((h) => [`${h.title}  (${h.slug})`, h.heading && `  ${h.heading}`, h.snippet !== h.heading && `  ${h.snippet}`, `  ${h.url}`].filter(Boolean).join('\n')).join('\n\n') : `no page matches "${query}"`);
   }
   const pages = (await call('GET', '/api/pages')).map((p) => ({ slug: p.slug, title: p.title, repo: p.repo, version: p.latest, updated: p.updated_at, pinned: !!p.pinned_at, shared: p.shared > 0, url: p.url }));
   out(0, pages, pages.length ? pages.map((p) => `${p.pinned ? '*' : ' '} v${String(p.version).padEnd(3)} ${p.updated.slice(0, 10)}  ${p.slug.padEnd(Math.max(...pages.map((x) => x.slug.length)))}  ${p.title}`).join('\n') : 'no pages yet');

@@ -344,8 +344,8 @@ function hit(x) {
   const inTitle = unmark(x.snippet) === x.title;
   return '<a class="h-hit" data-slug="' + x.slug + '" href="' + hitPath(x) + '"><span class="h-hit-head"><span class="h-title">' + (inTitle ? mark(x.snippet) : h(x.title)) + '</span>'
     + '<span class="h-repo">' + h(x.repo || x.slug.split('/')[0]) + '</span></span>'
-    + (x.heading ? '<span class="h-hit-where">' + h(x.heading) + '</span>' : '')
-    + (inTitle || !x.snippet ? '' : '<span class="h-hit-snip">' + mark(x.snippet) + '</span>') + '</a>';
+    + (x.heading ? '<span class="h-hit-where">' + (unmark(x.snippet) === x.heading ? mark(x.snippet) : h(x.heading)) + '</span>' : '')
+    + (inTitle || !x.snippet || unmark(x.snippet) === x.heading ? '' : '<span class="h-hit-snip">' + mark(x.snippet) + '</span>') + '</a>';
 }
 
 function render() {
