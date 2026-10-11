@@ -29,20 +29,20 @@ For example, a service's 15-minute refresh interval can be one label in a system
 
 ## Choose the form within the page
 
-Use visuals to make relationships visible and comparisons easy to scan. Prefer a diagram when prose would make the reader reconstruct connections, sequence, or branches. Replacing a useful diagram with several paragraphs increases the reader's work. Keep the visual and use prose for the meaning, reasons, and conditions it cannot convey clearly.
+Choose the relationship the reader needs to see before choosing a component. Prefer diagrams for connections, transformations, sequence, and branches. Tables suit lookup and comparison of matching attributes. A table or set of cards does not explain a process merely by containing its parts. Use prose for meaning, reasons, and conditions the visual cannot convey clearly.
 
 | Reader's task | Useful form |
 |---|---|
 | Understand a definition, reason, or trade-off | Prose with an example when needed. |
 | Follow instructions | A numbered list, with a diagram where location or movement matters. |
-| Look up values or compare matching attributes | A table, including small comparisons. |
+| Look up values or compare matching attributes | A table with concise cells, including small comparisons. |
 | See magnitude, share, or change over time | A chart with units, labels, and an appropriate scale. |
 | Understand connections, sequence, or state | A diagram with enough text to explain its meaning. |
 | Explore how an input affects a result | An interactive model with visible assumptions and limits. |
 
-A number can stay in a sentence. A large number tile highlights a value but does not show a comparison. Add interaction only when changing an input helps answer a real question. Use precise terms such as table, chart, and diagram.
+A number can stay in a sentence. A large number tile highlights a value but does not show a comparison. Use interaction to explore inputs or reveal a complex sequence; keep short sequences visible together. Use precise terms such as table, chart, and diagram.
 
-For a system overview, start with a connected map of the main paths. Show how separate detail views connect to that map. Use a compact source table for what each input provides. Put supporting timing rules, code references, and failure mechanics in expandable details when the main explanation does not need them. Keep essential conditions visible. Avoid paragraphs inside table cells that obscure the comparison.
+For a system overview, start with a connected map of the main paths. Show sources → processing → outputs as connected groups. Show progression and readiness as stages with explicit status labels. Detail views should connect to the overview. Keep exact values in reference tables when useful. Move supporting timings, code references, and failure mechanics into expandable details. Keep essential conditions visible.
 
 ## Write clearly and preserve meaning
 
@@ -64,7 +64,7 @@ For example, keep a tax-column omission risk in the risk paragraph. Put the meas
 
 ## Review the result
 
-Scan the rendered page before reading every paragraph. Can a reader find the main answer, trace the relevant relationships, and compare the important differences? Check whether prose has replaced a clearer diagram or table. Then read the full page as someone without this conversation. Verify meaning, evidence, conditions, and accessible equivalents. Remove repetition and move supporting detail out of the main reading path. A page without overflow can still be hard to understand.
+Scan the rendered page before reading every paragraph or cell. Can a reader find the main answer, trace relationships, and compare important differences? Replace prose or tables that make the reader reconstruct a clearer visual structure. Then read the full page as someone without this conversation. Verify meaning, evidence, conditions, and accessible equivalents. Remove repetition and move supporting detail out of the main reading path. A page without overflow can still be hard to understand.
 
 For substantial work, use a separate reader review when available and appropriate. Give the reviewer the page and realistic questions without the conversation or intended answers. Check factual fidelity, comprehension, and emphasis, not just style adherence. Self-review is not an independent reader test.
 
