@@ -26,20 +26,20 @@ const decode = (s: string) =>
     .trim();
 
 /**
- * Reads the title from `<title>` and the repo and sha from the `.k-stamp` line
- * ("repo · sha · date · snapshot"). A page without a stamp gets no repo or sha.
+ * Reads the title from `<title>`. Reads the repo and the commit from the SNAPSHOT comment
+ * ("SNAPSHOT: <repo> at <sha> (<branch>) on <date>"), which agents read and people never see.
+ * Pages from before that comment held the commit in the `.k-stamp` line, so that is the fallback.
  */
 export function parseMeta(html: string, slug: string): PageMeta {
   const t = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
   const title = (t && decode(t[1])) || slug.split('/')[1];
+  const isSha = (x: string | undefined) => !!x && /^[0-9a-f]{4,40}$|^no-git$/.test(x);
+  const snap = html.match(/<!--\s*SNAPSHOT:\s*(\S+)\s+at\s+(\S+)/);
+  if (snap) return { title, repo: snap[1], sha: isSha(snap[2]) ? snap[2] : null };
   const stamp = html.match(/<p class="k-stamp"[^>]*>([\s\S]*?)<\/p>/i);
   if (!stamp) return { title, repo: null, sha: null };
-  const [repo, sha] = decode(stamp[1]).split(' · ').map((s) => s.trim());
-  return {
-    title,
-    repo: repo || null,
-    sha: sha && /^[0-9a-f]{4,40}$|^no-git$/.test(sha) ? sha : null,
-  };
+  const [repo, sha] = decode(stamp[1]).split(' · ').map((x) => x.trim());
+  return { title, repo: repo || null, sha: isSha(sha) ? sha : null };
 }
 
 /** 32 random bytes in base64url: the share token. */

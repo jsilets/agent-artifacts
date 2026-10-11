@@ -34,12 +34,15 @@ const icon = (name: string) => `<svg viewBox="0 0 24 24" aria-hidden="true">${IC
 const HOST_CSS = `
 html, body { height: 100%; margin: 0; background: var(--bg); color: var(--p); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
 :focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+:root { --press: #000; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --press: #fff; } }
+:root[data-theme="dark"] { --press: #fff; }
 button { font-family: var(--sans); }
 
 /* ─── The bar ───────────────────────────────────────────── */
 .v { --bar: 44px; display: flex; flex-direction: column; height: 100%; }
 .v-bar { position: relative; z-index: 10; flex: none; display: flex; align-items: center; gap: 2px; height: var(--bar); padding: 0 8px 0 6px; border-bottom: 0.5px solid var(--b); background: var(--bg); box-sizing: border-box; }
-.v-crumb { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; margin-left: 2px; font-size: 13.5px; line-height: 1; }
+.v-crumb { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; margin-left: 2px; font-size: 13.5px; line-height: 20px; }
 .v-repo { flex: 0 1 auto; max-width: 30%; color: var(--s); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .v-slash { color: var(--t); }
 .v-title { flex: 0 1 auto; min-width: 0; font-weight: 600; letter-spacing: -0.005em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -51,7 +54,7 @@ svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width:
 .v-icon.is-done { color: var(--ink); }
 
 /* The version pill: the one place the version shows. Amber when the reader is not on the latest. */
-.v-ver { flex: none; display: inline-flex; align-items: center; height: 28px; margin-right: 4px; padding: 0 2px; border: 0.5px solid var(--b2); border-radius: 999px; font: 500 12px var(--mono); color: var(--s); }
+.v-ver { flex: none; display: inline-flex; align-items: center; gap: 2px; height: 30px; margin-right: 6px; padding: 0 3px; border: 0.5px solid var(--b2); border-radius: 999px; font: 500 12px var(--mono); color: var(--s); }
 .v-ver.is-old { background: var(--fill); border-color: var(--line); color: var(--ink); }
 .v-step { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 999px; color: inherit; }
 .v-step:hover { background: var(--bg2); text-decoration: none; }
@@ -70,16 +73,18 @@ svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width:
 .v-item.v-latest:hover { background: color-mix(in srgb, var(--fill) 80%, var(--line)); }
 
 .v-share { flex: none; height: 30px; margin-left: 6px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--p); color: var(--bg); font: 600 13px var(--sans); cursor: pointer; }
-.v-share:hover { opacity: 0.86; }
+.v-share:hover { background: var(--press); }
 
 /* Tooltips: shown after a short pause, never while a menu is open. */
 [data-tip]:hover::after, [data-tip]:focus-visible::after { content: attr(data-tip); position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%); z-index: 40; padding: 4px 7px; border-radius: 6px; background: var(--p); color: var(--bg); font: 500 11.5px/1.2 var(--sans); white-space: nowrap; pointer-events: none; animation: v-tip 0.12s 0.4s both; }
 [data-tip-end]:hover::after, [data-tip-end]:focus-visible::after { left: auto; right: 0; transform: none; }
+[data-tip-start]:hover::after, [data-tip-start]:focus-visible::after { left: 0; transform: none; }
 [data-tip][aria-expanded="true"]::after { display: none; }
 @keyframes v-tip { from { opacity: 0; } }
 
 /* ─── Menus and popovers ────────────────────────────────── */
 .v-pop { position: absolute; top: calc(var(--bar) - 4px); right: 8px; z-index: 30; min-width: 232px; max-width: calc(100vw - 16px); padding: 6px; box-sizing: border-box; background: var(--bg); border: 0.5px solid var(--b2); border-radius: 12px; box-shadow: 0 14px 36px rgba(0, 0, 0, 0.16), 0 2px 6px rgba(0, 0, 0, 0.06); transform-origin: top right; animation: v-pop 0.14s ease-out; }
+.v-pop:not([hidden]) { display: flex; flex-direction: column; gap: 2px; }
 .v-pop[hidden] { display: none; }
 @keyframes v-pop { from { opacity: 0; transform: translateY(-4px) scale(0.98); } }
 .v-label { padding: 8px 10px 6px; font: 500 11.5px var(--sans); color: var(--t); }
@@ -91,7 +96,10 @@ svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width:
 .v-item.is-armed { background: var(--fill); }
 .v-hr { height: 0.5px; margin: 6px 4px; background: var(--b); }
 
-.v-vitem .v-num { font: 500 12.5px var(--mono); min-width: 28px; color: var(--s); }
+.v-item.v-vitem { min-height: 30px; padding: 5px 10px; gap: 8px; }
+.v-vitem .v-num { font: 500 12px var(--mono); min-width: 24px; color: var(--s); }
+.v-vitem .v-meta { font: 12px var(--sans); color: var(--s); }
+.v-vitem .v-tag { padding: 1px 6px; font-size: 10.5px; }
 .v-vitem[aria-current="page"] { background: var(--bg2); }
 .v-vitem[aria-current="page"] .v-num { font-weight: 600; color: var(--p); }
 .v-tag { padding: 2px 7px; border-radius: 999px; background: var(--bg2); font: 500 11px var(--sans); color: var(--s); }
@@ -108,7 +116,7 @@ svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width:
 .v-sharepop p { margin: 4px 0 12px; font-size: 12.5px; line-height: 1.45; color: var(--s); }
 .v-sharepop .v-seg { margin: 0 0 8px; }
 .v-create { width: 100%; height: 34px; border: 0; border-radius: 8px; background: var(--p); color: var(--bg); font: 600 13px var(--sans); cursor: pointer; }
-.v-create:hover { opacity: 0.86; }
+.v-create:hover:not(:disabled) { background: var(--press); }
 .v-create:disabled { opacity: 0.5; cursor: default; }
 .v-links { list-style: none; margin: 12px 0 0; padding: 0; }
 .v-links:empty::before { content: "No active links."; display: block; padding: 4px 2px; font-size: 12.5px; color: var(--t); }
@@ -284,6 +292,16 @@ function toast(text) {
   toastTimer = setTimeout(() => (toastEl.hidden = true), 1800);
 }
 
+// Publish times, in the reader's time zone: "Today, 9:41 PM" or "Oct 9, 9:41 PM".
+$$('time[datetime]').forEach((t) => {
+  const d = new Date(t.dateTime), now = new Date();
+  const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const same = (a, b) => a.toDateString() === b.toDateString();
+  const y = new Date(now); y.setDate(now.getDate() - 1);
+  t.textContent = (same(d, now) ? 'Today' : same(d, y) ? 'Yesterday' : d.toLocaleDateString([], { month: 'short', day: 'numeric', ...(d.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}) })) + ', ' + time;
+  t.title = d.toLocaleString();
+});
+
 const frame = $('iframe');
 let theme = 'auto';
 try { theme = localStorage.getItem('theme') || 'auto'; } catch {}
@@ -315,12 +333,12 @@ export function viewerHtml(input: ViewerInput, nonce: string) {
       (v) => `<a class="v-item v-vitem" href="${href(v.version)}"${v.version === n ? ' aria-current="page"' : ''}>
         <span class="v-num">v${v.version}</span>
         ${v.version === latest ? '<span class="v-tag">Latest</span>' : ''}
-        <span class="v-meta">${esc(shortDay(v.created_at))}${v.sha ? ` · ${esc(v.sha)}` : ''}</span></a>`,
+        <time class="v-meta" datetime="${esc(v.created_at)}">${esc(shortDay(v.created_at))}</time></a>`,
     )
     .join('');
   const body = `<div class="v">
 <header class="v-bar">
-  <a class="v-icon" href="/" data-tip="All pages" aria-label="All pages">${icon('grid')}</a>
+  <a class="v-icon" href="/" data-tip="All pages" data-tip-start aria-label="All pages">${icon('grid')}</a>
   <div class="v-crumb">${repo ? `<span class="v-repo">${esc(repo)}</span><span class="v-slash">/</span>` : ''}<span class="v-title">${esc(title)}</span></div>
   <div class="v-ver${old ? ' c-amber is-old' : ''}">
     ${step('left', n - 1, 'Previous version')}

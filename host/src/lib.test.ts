@@ -24,6 +24,10 @@ describe('parseMeta', () => {
     expect(parseMeta(page('scratch · no-git · 2026-10-10 · snapshot'), 'x/y').sha).toBe('no-git');
     expect(parseMeta(page('scratch · <b>hi</b> · 2026-10-10'), 'x/y').sha).toBe(null);
   });
+  it('prefers the SNAPSHOT comment for the repo and commit', () => {
+    const html = '<!-- SNAPSHOT: billing-service at 0880549 (main) on 2026-10-10. Do not plan from it. --><title>T</title><p class="k-stamp">billing-service · snapshot · Oct 10, 2026</p>';
+    expect(parseMeta(html, 'x/y')).toEqual({ title: 'T', repo: 'billing-service', sha: '0880549' });
+  });
   it('falls back to the slug name when there is no title or stamp', () => {
     expect(parseMeta('<html><body>hi</body></html>', 'group/my-page')).toEqual({ title: 'my-page', repo: null, sha: null });
   });

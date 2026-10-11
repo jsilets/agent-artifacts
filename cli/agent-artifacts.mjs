@@ -48,7 +48,8 @@ function cmdNew() {
   const t = title || slug.replace(/-/g, ' ').replace(/^./, (c) => c.toUpperCase());
   const html = readFileSync(join(KIT, 'template.html'), 'utf8')
     .replace('href="explain.css"', `href="${join(KIT, 'explain.css')}"`).replace('src="explain.js"', `src="${join(KIT, 'explain.js')}"`)
-    .replaceAll('{{TITLE}}', t).replaceAll('{{REPO}}', repo).replaceAll('{{SHA}}', sha).replaceAll('{{BRANCH}}', branch).replaceAll('{{DATE}}', date);
+    .replaceAll('{{TITLE}}', t).replaceAll('{{REPO}}', repo).replaceAll('{{SHA}}', sha).replaceAll('{{BRANCH}}', branch).replaceAll('{{DATE}}', date)
+    .replaceAll('{{DAY}}', new Date(date + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }));
   writeFileSync(out, html);
   console.log(out);
 }
@@ -149,6 +150,8 @@ function lint(html, file) {
   // Shape
   if (!/<!--\s*SNAPSHOT:/.test(html)) err('missing the SNAPSHOT comment at the top. Start from "agent-artifacts new"');
   if (!/class="k-stamp"/.test(html)) err('missing the .k-stamp line under the h1');
+  const stampText = html.match(/<p class="k-stamp"[^>]*>([\s\S]*?)<\/p>/i);
+  if (stampText && /\b[0-9a-f]{7,40}\b/.test(stampText[1])) warn('the .k-stamp shows a commit hash. Readers do not need it; the SNAPSHOT comment keeps it for agents');
   const h1 = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
   if (!h1) err('missing the h1 title');
   const lede = html.match(/<p class="k-lede">([\s\S]*?)<\/p>/);
