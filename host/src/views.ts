@@ -7,8 +7,6 @@ export const esc = (s: string | number | null | undefined) =>
 /** JSON for a <script type="application/json"> block. */
 const data = (v: unknown) => JSON.stringify(v).replace(/</g, '\\u003c');
 
-const day = (iso: string) => iso.slice(0, 10);
-
 /** "Oct 11" in UTC, for the version list. */
 const shortDay = (iso: string) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 
@@ -28,6 +26,11 @@ const ICON: Record<string, string> = {
   download: '<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/>',
   trash: '<path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l.9 12.1a1.5 1.5 0 0 0 1.5 1.4h6.2a1.5 1.5 0 0 0 1.5-1.4L17.5 7"/>',
   x: '<path d="m7 7 10 10M17 7 7 17"/>',
+  search: '<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/>',
+  list: '<path d="M9 6.5h11M9 12h11M9 17.5h11"/><circle cx="4.8" cy="6.5" r="0.9" fill="currentColor"/><circle cx="4.8" cy="12" r="0.9" fill="currentColor"/><circle cx="4.8" cy="17.5" r="0.9" fill="currentColor"/>',
+  pin: '<path d="M9 3.5h6l-.9 6.2 3.4 3.3V15h-11v-2l3.4-3.3z"/><path d="M12 15v5.5"/>',
+  lock: '<rect x="5" y="10.5" width="14" height="9.5" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/>',
+  globe: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.4 3.6 5.2 3.6 8.5s-1.2 6.1-3.6 8.5c-2.4-2.4-3.6-5.2-3.6-8.5S9.6 5.9 12 3.5Z"/>',
 };
 const icon = (name: string) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[name]}</svg>`;
 
@@ -86,6 +89,7 @@ svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width:
 .v-pop { position: absolute; top: calc(var(--bar) - 4px); right: 8px; z-index: 30; min-width: 232px; max-width: calc(100vw - 16px); padding: 6px; box-sizing: border-box; background: var(--bg); border: 0.5px solid var(--b2); border-radius: 12px; box-shadow: 0 14px 36px rgba(0, 0, 0, 0.16), 0 2px 6px rgba(0, 0, 0, 0.06); transform-origin: top right; animation: v-pop 0.14s ease-out; }
 .v-pop:not([hidden]) { display: flex; flex-direction: column; gap: 2px; }
 .v-pop[hidden] { display: none; }
+.v-pop[data-anchor] { position: fixed; }
 @keyframes v-pop { from { opacity: 0; transform: translateY(-4px) scale(0.98); } }
 .v-label { padding: 8px 10px 6px; font: 500 11.5px var(--sans); color: var(--t); }
 .v-item { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 34px; padding: 6px 10px; box-sizing: border-box; border: 0; border-radius: 8px; background: transparent; color: var(--p); font: 500 13px var(--sans); text-align: left; text-decoration: none; cursor: pointer; }
@@ -138,16 +142,99 @@ svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width:
 }
 
 /* ─── Library ───────────────────────────────────────────── */
-.h-lib { max-width: 760px; margin: 0 auto; padding: 32px 24px 56px; }
-.h-lib h1 { font-size: 24px; margin: 0 0 16px; }
-.h-lib input { width: 100%; box-sizing: border-box; padding: 8px 12px; border: 0.5px solid var(--b2); border-radius: 8px; background: var(--bg); color: var(--p); font: 500 14px var(--sans); }
-.h-lib h2 { font: 500 12px var(--mono); color: var(--s); margin: 28px 0 6px; text-transform: none; }
-.h-lib ul { list-style: none; margin: 0; padding: 0; }
-.h-lib li { display: flex; gap: 12px; align-items: baseline; padding: 8px 0; border-top: 0.5px solid var(--b); }
-.h-lib li a { flex: 1; font-weight: 500; color: var(--p); text-decoration: none; }
-.h-lib li a:hover { color: var(--link); }
-.h-lib li span { font: 12px var(--mono); color: var(--t); white-space: nowrap; }
-.h-empty { color: var(--s); margin-top: 24px; }
+.h-bar { --bar: 44px; position: sticky; top: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 520px) minmax(0, 1fr); gap: 12px; padding: 0 8px 0 16px; }
+.h-brand { font: 600 13.5px/20px var(--sans); letter-spacing: -0.005em; }
+.h-search { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 9px 0 11px; border-radius: 999px; background: var(--bg2); color: var(--t); cursor: text; }
+.h-search:focus-within { background: var(--bg); box-shadow: inset 0 0 0 0.5px var(--b2), 0 0 0 3px color-mix(in srgb, var(--link) 18%, transparent); }
+.h-search svg { width: 15px; height: 15px; }
+.h-search input { flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; background: transparent; color: var(--p); font: 500 13.5px var(--sans); outline: none; }
+.h-search input::placeholder { color: var(--t); }
+.h-search input::-webkit-search-cancel-button { display: none; }
+.h-search:focus-within kbd, .h-search.has-q kbd { visibility: hidden; }
+kbd { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px; box-sizing: border-box; border-radius: 5px; box-shadow: inset 0 0 0 0.5px var(--b2); font: 500 11px var(--mono); color: var(--s); }
+.h-tools { display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
+.h-tools .v-seg { margin: 0 2px 0 0; }
+.h-tools .v-seg button { position: relative; flex: none; width: 30px; height: 26px; padding: 0; }
+.h-keys { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 7px 12px; margin: 0; padding: 0 10px 8px; font: 12.5px var(--sans); color: var(--s); }
+.h-keys dt { display: flex; gap: 3px; }
+.h-keys dd { margin: 0; }
+
+.h-main { max-width: 1240px; margin: 0 auto; padding: 18px 24px 72px; }
+.h-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 20px; }
+.h-chip { height: 28px; padding: 0 12px; border: 0.5px solid var(--b2); border-radius: 999px; background: transparent; color: var(--s); font: 500 12px var(--mono); cursor: pointer; }
+.h-chip.is-all { font: 500 12.5px var(--sans); }
+.h-chip:hover { background: var(--bg2); color: var(--p); }
+.h-chip[aria-pressed="true"] { border-color: var(--p); background: var(--p); color: var(--bg); }
+.h-label { display: flex; align-items: center; gap: 6px; margin: 0 0 12px; font: 500 12px var(--sans); color: var(--s); }
+.h-label svg { width: 13px; height: 13px; }
+.h-grid + .h-label, .h-list + .h-label { margin-top: 34px; }
+
+/* A card: the top of the page, then its title. Each version after the first adds a sheet behind it, up to two. */
+.h-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); gap: 26px 20px; }
+.h-card { position: relative; padding-top: 7px; }
+.h-link { display: block; color: inherit; text-decoration: none; outline: none; }
+.h-link:hover { text-decoration: none; }
+.h-thumb { --ring: var(--b); position: relative; display: grid; place-items: center; aspect-ratio: 16 / 10; overflow: hidden; border-radius: 10px; background: var(--bg2); box-shadow: 0 0 0 0.5px var(--ring); transition: box-shadow 0.15s; }
+.h-thumb[data-sheets="1"] { box-shadow: 0 0 0 0.5px var(--ring), 0 -7px 0 -4px var(--bg3), 0 -7px 0 -3.5px var(--b); }
+.h-thumb[data-sheets="2"] { box-shadow: 0 0 0 0.5px var(--ring), 0 -7px 0 -4px var(--bg3), 0 -7px 0 -3.5px var(--b), 0 -14px 0 -8px var(--bg3), 0 -14px 0 -7.5px var(--b); }
+.h-link:hover .h-thumb { --ring: var(--b2); }
+.h-card.is-sel .h-thumb, .h-link:focus-visible .h-thumb { outline: 2px solid var(--link); outline-offset: 2px; }
+.h-img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
+.h-dark { display: none; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .h-light { display: none; } :root:not([data-theme="light"]) .h-dark { display: block; } }
+:root[data-theme="dark"] .h-light { display: none; }
+:root[data-theme="dark"] .h-dark { display: block; }
+.h-ph { font: 500 20px var(--mono); letter-spacing: -0.04em; color: var(--t); }
+.h-title { display: block; min-width: 0; margin-top: 10px; overflow: hidden; font: 600 13.5px/20px var(--sans); letter-spacing: -0.005em; color: var(--p); white-space: nowrap; text-overflow: ellipsis; }
+.h-sub { display: flex; align-items: center; gap: 6px; margin-top: 1px; font: 12px/18px var(--sans); color: var(--s); }
+.h-sub svg, .h-acc svg { width: 13px; height: 13px; color: var(--t); }
+.h-v { margin-left: auto; font: 500 11.5px var(--mono); color: var(--t); }
+.h-menu { position: absolute; top: 15px; right: 8px; width: 28px; height: 28px; background: var(--bg); box-shadow: 0 0 0 0.5px var(--b2), 0 2px 6px rgba(0, 0, 0, 0.08); opacity: 0; }
+.h-menu:hover, .h-menu[aria-expanded="true"] { background: var(--bg); }
+.h-card:hover .h-menu, .h-card.is-sel .h-menu, .h-row:hover .h-menu, .h-row.is-sel .h-menu, .h-menu:focus-visible, .h-menu[aria-expanded="true"] { opacity: 1; }
+@media (hover: none) { .h-menu { opacity: 1; } }
+
+/* The list: one row a page. Rows keep a 2px gap, so two hovered rows never touch. */
+.h-list { display: flex; flex-direction: column; gap: 2px; }
+.h-row { position: relative; }
+.h-row .h-link { display: grid; grid-template-columns: 52px minmax(0, 1fr) minmax(0, 240px) 150px 32px 16px; align-items: center; gap: 14px; height: 48px; padding: 0 48px 0 8px; border-radius: 10px; }
+.h-row .h-link:hover, .h-row.is-sel .h-link { background: var(--bg2); }
+.h-row.is-sel .h-link, .h-hit.is-sel { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--link) 55%, transparent); }
+.h-row .h-thumb { border-radius: 5px; }
+.h-row .h-ph { font-size: 10px; }
+.h-row .h-title { margin: 0; font-weight: 500; }
+.h-repo { min-width: 0; overflow: hidden; font: 12px var(--mono); color: var(--s); white-space: nowrap; text-overflow: ellipsis; }
+.h-row .h-when { font-size: 12.5px; color: var(--s); white-space: nowrap; }
+.h-row .h-v { margin: 0; text-align: right; }
+.h-acc { display: grid; place-items: center; }
+.h-row .h-menu { top: 10px; background: transparent; box-shadow: none; }
+.h-row .h-menu:hover, .h-row .h-menu[aria-expanded="true"] { background: var(--bg3); }
+
+/* Search results: the best match on each page. A click opens the page at that claim. */
+.h-hits { display: flex; flex-direction: column; gap: 2px; max-width: 760px; }
+.h-hit { display: block; padding: 10px 12px; border-radius: 10px; color: inherit; text-decoration: none; }
+.h-hit:hover, .h-hit.is-sel { background: var(--bg2); text-decoration: none; }
+.h-hit-head { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.h-hit .h-title { flex: 0 1 auto; margin: 0; }
+.h-hit .h-repo { flex: 0 1 auto; }
+.h-hit-where { display: block; margin-top: 2px; font: 500 12.5px/18px var(--sans); color: var(--s); }
+.h-hit-snip { display: -webkit-box; margin-top: 3px; overflow: hidden; font: 13px/1.5 var(--sans); color: var(--s); -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+mark { padding: 0 1px; border-radius: 3px; background: color-mix(in srgb, var(--link) 20%, transparent); color: var(--p); }
+.h-none { margin: 4px 0 0; font-size: 13.5px; color: var(--s); }
+
+.h-empty { display: grid; justify-items: center; gap: 4px; margin: 14vh auto 0; text-align: center; font-size: 13.5px; color: var(--s); }
+.h-empty .h-thumb { width: 168px; margin-bottom: 14px; }
+.h-empty b { font-weight: 600; color: var(--p); }
+
+@media (max-width: 640px) {
+  .h-bar { grid-template-columns: minmax(0, 1fr) auto; padding-left: 8px; }
+  .h-brand, .h-search kbd { display: none; }
+  .h-main { padding: 14px 14px 56px; }
+  .h-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 22px 12px; }
+  .h-row .h-link { grid-template-columns: 52px minmax(0, 1fr) 32px; }
+  .h-row .h-repo, .h-row .h-when, .h-row .h-acc { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .h-thumb { transition: none; } }
 `;
 
 function shell(title: string, nonce: string, body: string, script = '', cssPath = '/_/explain.css') {
@@ -173,40 +260,205 @@ export interface PageRow {
   repo: string | null;
   latest: number;
   updated_at: string;
+  /** When the page was pinned, or null. */
+  pinned_at: string | null;
+  /** The version that has thumbnails, or null. */
+  thumb: number | null;
+  /** The number of active share links. */
+  shared: number;
 }
 
+/**
+ * The library. The script draws it from the JSON block, so the grid or list choice,
+ * the repo filter, pins and search results all redraw without a reload.
+ */
 export function libraryHtml(pages: PageRow[], nonce: string) {
-  const groups = new Map<string, PageRow[]>();
-  for (const p of pages) {
-    const g = p.repo || p.slug.split('/')[0];
-    if (!groups.has(g)) groups.set(g, []);
-    groups.get(g)!.push(p);
+  const body = `<header class="v-bar h-bar">
+  <span class="h-brand">Pages</span>
+  <label class="h-search">${icon('search')}<input id="q" type="search" placeholder="Search pages" autocomplete="off" spellcheck="false" aria-label="Search pages"><kbd>/</kbd></label>
+  <div class="h-tools">
+    <div class="v-seg" role="group" aria-label="Layout">
+      <button type="button" data-view="grid" aria-label="Grid" data-tip="Grid">${icon('grid')}</button>
+      <button type="button" data-view="list" aria-label="List" data-tip="List">${icon('list')}</button>
+    </div>
+    <button type="button" class="v-icon" data-pop="pop-more" data-tip="More" data-tip-end aria-label="More">${icon('more')}</button>
+  </div>
+  <div class="v-pop" id="pop-more" hidden>
+    ${appearance()}
+    <div class="v-hr"></div>
+    <div class="v-label">Keyboard</div>
+    <dl class="h-keys">
+      <dt><kbd>/</kbd></dt><dd>Search</dd>
+      <dt><kbd>j</kbd><kbd>k</kbd></dt><dd>Next and previous page</dd>
+      <dt><kbd>o</kbd></dt><dd>Open</dd>
+      <dt><kbd>c</kbd></dt><dd>Copy link</dd>
+      <dt><kbd>p</kbd></dt><dd>Pin or unpin</dd>
+    </dl>
+  </div>
+</header>
+<main class="h-main" id="main"></main>
+<div class="v-pop" id="pop-card" data-anchor hidden>
+  <button type="button" class="v-item" data-act="pin">${icon('pin')}<span>Pin</span></button>
+  <button type="button" class="v-item" data-act="copy">${icon('link')}Copy link</button>
+  <a class="v-item" data-act="tab" target="_blank" rel="noopener">${icon('open')}Open in new tab</a>
+</div>
+<div class="v-toast" id="toast" role="status" hidden></div>
+<script type="application/json" id="data">${data({ pages, icons: { more: ICON.more, pin: ICON.pin, lock: ICON.lock, globe: ICON.globe } })}</script>`;
+
+  const script =
+    COMMON_SCRIPT +
+    `
+const D = JSON.parse($('#data').textContent);
+const svg = (name) => '<svg viewBox="0 0 24 24" aria-hidden="true">' + D.icons[name] + '</svg>';
+const h = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const repoOf = (p) => p.repo || p.slug.split('/')[0];
+const pages = D.pages;
+let view = 'grid', repo = '', hits = null, sel = -1, menuSlug = null;
+try { view = localStorage.getItem('library-view') === 'list' ? 'list' : 'grid'; } catch {}
+
+// "2h ago" for this week, then the date.
+function ago(iso) {
+  const s = (Date.now() - Date.parse(iso)) / 1000;
+  if (s < 60) return 'just now';
+  if (s < 3600) return Math.floor(s / 60) + 'm ago';
+  if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+  if (s < 7 * 86400) return Math.floor(s / 86400) + 'd ago';
+  const d = new Date(iso);
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric', ...(d.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {}) });
+}
+const thumb = (p, sheets) => '<span class="h-thumb"' + (sheets ? ' data-sheets="' + sheets + '"' : '') + '>' + (p.thumb
+  ? ['light', 'dark'].map((t) => '<img class="h-img h-' + t + '" src="/t/' + p.slug + '/' + p.thumb + '/' + t + '.webp" alt="" loading="lazy" decoding="async">').join('')
+  : '<span class="h-ph">&lt;/&gt;</span>') + '</span>';
+const access = (p) => '<span class="h-acc" title="' + (p.shared ? 'Shared by link' : 'Only you') + '">' + svg(p.shared ? 'globe' : 'lock') + '</span>';
+const menu = (p) => '<button type="button" class="v-icon h-menu" aria-label="More for ' + h(p.title) + '" aria-expanded="false">' + svg('more') + '</button>';
+const card = (p) => '<article class="h-card" data-slug="' + p.slug + '"><a class="h-link" href="/p/' + p.slug + '">'
+  + thumb(p, Math.min(2, p.latest - 1)) + '<span class="h-title">' + h(p.title) + '</span>'
+  + '<span class="h-sub">' + access(p) + '<span>Published ' + ago(p.updated_at) + '</span><span class="h-v">v' + p.latest + '</span></span></a>' + menu(p) + '</article>';
+const row = (p) => '<article class="h-row" data-slug="' + p.slug + '"><a class="h-link" href="/p/' + p.slug + '">'
+  + thumb(p, 0) + '<span class="h-title">' + h(p.title) + '</span><span class="h-repo">' + h(repoOf(p)) + '</span>'
+  + '<span class="h-when">Published ' + ago(p.updated_at) + '</span><span class="h-v">v' + p.latest + '</span>' + access(p) + '</a>' + menu(p) + '</article>';
+const mark = (s) => h(s).replace(/\\u0002/g, '<mark>').replace(/\\u0003/g, '</mark>');
+const unmark = (s) => s.replace(/[\\u0002\\u0003]/g, '');
+const hitPath = (x) => '/p/' + x.slug + (x.anchor ? '#' + x.anchor : '');
+function hit(x) {
+  const inTitle = unmark(x.snippet) === x.title;
+  return '<a class="h-hit" data-slug="' + x.slug + '" href="' + hitPath(x) + '"><span class="h-hit-head"><span class="h-title">' + (inTitle ? mark(x.snippet) : h(x.title)) + '</span>'
+    + '<span class="h-repo">' + h(x.repo || x.slug.split('/')[0]) + '</span></span>'
+    + (x.heading ? '<span class="h-hit-where">' + h(x.heading) + '</span>' : '')
+    + (inTitle || !x.snippet ? '' : '<span class="h-hit-snip">' + mark(x.snippet) + '</span>') + '</a>';
+}
+
+function render() {
+  const main = $('#main');
+  $$('[data-view]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.view === view)));
+  if (hits) {
+    main.innerHTML = hits.length
+      ? '<div class="h-label">' + hits.length + (hits.length === 1 ? ' page matches' : ' pages match') + '</div><div class="h-hits">' + hits.map(hit).join('') + '</div>'
+      : '<p class="h-none">No page has text that matches \\u201c' + h($('#q').value.trim()) + '\\u201d.</p>';
+  } else if (!pages.length) {
+    main.innerHTML = '<div class="h-empty"><span class="h-thumb"><span class="h-ph">&lt;/&gt;</span></span><b>No pages yet</b><span>Publish one with <code>agent-pages publish &lt;page&gt;</code>.</span></div>';
+  } else {
+    const repos = [...new Set(pages.map(repoOf))];
+    if (!repos.includes(repo)) repo = '';
+    const shown = pages.filter((p) => !repo || repoOf(p) === repo);
+    const pinned = shown.filter((p) => p.pinned_at).sort((a, b) => b.pinned_at.localeCompare(a.pinned_at));
+    const rest = shown.filter((p) => !p.pinned_at);
+    const block = (label, list) => (label ? '<div class="h-label">' + label + '</div>' : '') + '<div class="h-' + view + '">' + list.map(view === 'grid' ? card : row).join('') + '</div>';
+    main.innerHTML = (repos.length > 1 ? '<div class="h-chips" role="group" aria-label="Repo">' + ['', ...repos].map((r) => '<button type="button" class="h-chip' + (r ? '' : ' is-all') + '" data-repo="' + h(r) + '" aria-pressed="' + (r === repo) + '">' + (r ? h(r) : 'All') + '</button>').join('') + '</div>' : '')
+      + (pinned.length ? block(svg('pin') + 'Pinned', pinned) : '') + (rest.length ? block(pinned.length ? 'Recent' : '', rest) : '');
   }
-  const list = [...groups]
-    .map(
-      ([g, rows]) => `<section data-group><h2>${esc(g)}</h2><ul>${rows
-        .map(
-          (p) =>
-            `<li data-q="${esc(`${p.title} ${p.slug}`.toLowerCase())}"><a href="/p/${esc(p.slug)}">${esc(p.title)}</a><span>v${p.latest}</span><span>${esc(day(p.updated_at))}</span></li>`,
-        )
-        .join('')}</ul></section>`,
-    )
-    .join('');
-  const body = `<main class="h-lib">
-<h1>Pages</h1>
-<input id="q" type="search" placeholder="Filter by title" autocomplete="off" autofocus>
-${list || '<p class="h-empty">No pages yet. Publish one with <code>agent-pages publish &lt;page&gt;</code>.</p>'}
-</main>`;
-  const script = `
-const q = document.getElementById('q');
-q.addEventListener('input', () => {
-  const v = q.value.trim().toLowerCase();
-  document.querySelectorAll('[data-group]').forEach((s) => {
-    let any = false;
-    s.querySelectorAll('li').forEach((li) => { const on = !v || li.dataset.q.includes(v); li.hidden = !on; any ||= on; });
-    s.hidden = !any;
-  });
-});`;
+  select(Math.min(sel, entries().length - 1), false);
+}
+const entries = () => $$('#main [data-slug]');
+function select(i, scroll = true) {
+  sel = i;
+  entries().forEach((el, j) => el.classList.toggle('is-sel', j === i));
+  if (scroll && i >= 0) entries()[i].scrollIntoView({ block: 'nearest' });
+}
+const current = () => entries()[sel];
+const pageOf = (slug) => pages.find((p) => p.slug === slug);
+
+$('#main').addEventListener('click', (e) => {
+  const chip = e.target.closest('[data-repo]');
+  if (chip) { repo = chip.dataset.repo; sel = -1; render(); return; }
+  const btn = e.target.closest('.h-menu');
+  if (btn) {
+    e.preventDefault();
+    e.stopPropagation();
+    menuSlug = btn.closest('[data-slug]').dataset.slug;
+    const p = pageOf(menuSlug), pop = $('#pop-card');
+    $('[data-act="pin"] span', pop).textContent = p.pinned_at ? 'Unpin' : 'Pin';
+    $('[data-act="tab"]', pop).href = '/p/' + p.slug;
+    openPop(btn, pop, e.detail === 0);
+  }
+});
+
+const copyLink = (slug) => navigator.clipboard.writeText(location.origin + '/p/' + slug).then(() => toast('Link copied'), () => toast('Could not copy the link'));
+async function togglePin(slug) {
+  const p = pageOf(slug), was = p.pinned_at;
+  p.pinned_at = was ? null : new Date().toISOString();
+  render();
+  toast(was ? 'Unpinned' : 'Pinned');
+  const r = await fetch('/api/pages/' + slug + '/pin', { method: was ? 'DELETE' : 'PUT' }).catch(() => null);
+  if (!r || !r.ok) { p.pinned_at = was; render(); toast('Could not change the pin'); }
+}
+$('#pop-card').addEventListener('click', (e) => {
+  const act = e.target.closest('[data-act]')?.dataset.act;
+  if (!act || !menuSlug) return;
+  if (act !== 'tab') closePop();
+  if (act === 'pin') togglePin(menuSlug);
+  if (act === 'copy') copyLink(menuSlug);
+  if (act === 'tab') closePop();
+});
+
+$$('[data-view]').forEach((b) => b.addEventListener('click', () => {
+  view = b.dataset.view;
+  try { localStorage.setItem('library-view', view); } catch {}
+  render();
+}));
+
+// Search: the host ranks matches with FTS5. A newer request cancels the one before it.
+const q = $('#q');
+let timer, ctl;
+async function runSearch() {
+  const text = q.value.trim();
+  q.parentElement.classList.toggle('has-q', !!q.value);
+  if (ctl) ctl.abort();
+  if (!text) { hits = null; sel = -1; render(); return; }
+  ctl = new AbortController();
+  try {
+    const r = await fetch('/api/search?q=' + encodeURIComponent(text), { signal: ctl.signal });
+    if (!r.ok) throw new Error(r.statusText);
+    hits = await r.json();
+    sel = hits.length ? 0 : -1;
+    render();
+  } catch (err) { if (err.name !== 'AbortError') toast('Search failed'); }
+}
+q.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(runSearch, 120); });
+q.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { e.stopPropagation(); if (q.value) { q.value = ''; runSearch(); } else q.blur(); }
+  else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); move(e.key === 'ArrowDown' ? 1 : -1); }
+  else if (e.key === 'Enter') { e.preventDefault(); const el = current() || entries()[0]; if (el) location.href = el.querySelector('a, [href]')?.href || el.href; }
+});
+
+function move(d) {
+  const n = entries().length;
+  if (n) select(sel < 0 ? (d > 0 ? 0 : n - 1) : Math.max(0, Math.min(n - 1, sel + d)));
+}
+document.addEventListener('keydown', (e) => {
+  if (e.metaKey || e.ctrlKey || e.altKey) { if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); q.focus(); q.select(); } return; }
+  if (open || e.target.closest('input, textarea, select, [contenteditable]')) return;
+  const el = current(), slug = el && el.dataset.slug;
+  if (e.key === '/') { e.preventDefault(); q.focus(); q.select(); }
+  else if (e.key === 'j' || e.key === 'ArrowDown') { e.preventDefault(); move(1); }
+  else if (e.key === 'k' || e.key === 'ArrowUp') { e.preventDefault(); move(-1); }
+  else if ((e.key === 'o' || e.key === 'Enter') && el) { e.preventDefault(); location.href = (el.matches('a') ? el : el.querySelector('a')).href; }
+  else if (e.key === 'c' && slug) copyLink(slug);
+  else if (e.key === 'p' && slug && !hits) togglePin(slug);
+});
+
+render();
+`;
   return shell('Pages', nonce, body, script);
 }
 
@@ -255,22 +507,25 @@ function closePop(focus) {
   open = null;
 }
 function items(pop) { return $$('a[href], button:not(:disabled)', pop).filter((e) => e.offsetParent); }
+// A popover with data-anchor opens under its button wherever the button is; the others open under the bar.
+function openPop(btn, pop, viaKey) {
+  const was = open && open.pop === pop && open.btn === btn;
+  closePop();
+  if (was) return;
+  pop.hidden = false;
+  const r = btn.getBoundingClientRect();
+  if (pop.hasAttribute('data-anchor')) pop.style.top = r.bottom + 4 + 'px';
+  pop.style.right = Math.max(8, Math.min(window.innerWidth - r.right, window.innerWidth - pop.offsetWidth - 8)) + 'px';
+  btn.setAttribute('aria-expanded', 'true');
+  open = { pop, btn };
+  pop.dispatchEvent(new Event('open'));
+  if (viaKey) items(pop)[0]?.focus();
+}
 $$('[data-pop]').forEach((btn) => {
-  const pop = document.getElementById(btn.dataset.pop);
   btn.setAttribute('aria-expanded', 'false');
-  btn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const was = open && open.pop === pop;
-    closePop();
-    if (was) return;
-    pop.hidden = false;
-    const r = btn.getBoundingClientRect();
-    pop.style.right = Math.max(8, Math.min(window.innerWidth - r.right, window.innerWidth - pop.offsetWidth - 8)) + 'px';
-    btn.setAttribute('aria-expanded', 'true');
-    open = { pop, btn };
-    pop.dispatchEvent(new Event('open'));
-    if (e.detail === 0) items(pop)[0]?.focus();
-  });
+  btn.addEventListener('click', (e) => { e.stopPropagation(); openPop(btn, document.getElementById(btn.dataset.pop), e.detail === 0); });
+});
+$$('.v-pop').forEach((pop) => {
   pop.addEventListener('click', (e) => e.stopPropagation());
   pop.addEventListener('keydown', (e) => {
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
@@ -282,6 +537,7 @@ $$('[data-pop]').forEach((btn) => {
 document.addEventListener('click', () => closePop());
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePop(true); });
 window.addEventListener('blur', () => closePop());
+window.addEventListener('scroll', () => { if (open && open.pop.hasAttribute('data-anchor')) closePop(); }, { passive: true });
 
 const toastEl = $('#toast');
 let toastTimer;
@@ -308,7 +564,9 @@ try { theme = localStorage.getItem('theme') || 'auto'; } catch {}
 function applyTheme() {
   if (theme === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = theme;
   $$('[data-theme-set]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.themeSet === theme)));
-  const src = frame.dataset.src + (theme === 'auto' ? '' : '?theme=' + theme);
+  if (!frame) return;
+  // A search result links to /p/<slug>#claim-2. The hash goes to the frame, which scrolls to that claim.
+  const src = frame.dataset.src + (theme === 'auto' ? '' : '?theme=' + theme) + location.hash;
   if (frame.getAttribute('src') !== src) frame.src = src;
 }
 $$('[data-theme-set]').forEach((b) => b.addEventListener('click', () => {

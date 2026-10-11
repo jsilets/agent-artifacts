@@ -6,8 +6,9 @@
 //   agent-pages pack <page.html> [-o out.html] [--inline]          lint, then inline the kit into one file
 //   agent-pages serve <page.html> [--port 8765]                    serve the page's folder on 127.0.0.1, print the URL
 //   agent-pages publish <page.html> [--slug g/n] [--share] [--json] send the page to the host, print its URL
+//   agent-pages list [--search "words"] [--json]                  list the pages on the host, or search their text
 //
-// publish reads AGENT_PAGES_URL, AGENT_PAGES_CLIENT_ID and AGENT_PAGES_CLIENT_SECRET.
+// publish and list read AGENT_PAGES_URL, AGENT_PAGES_CLIENT_ID and AGENT_PAGES_CLIENT_SECRET.
 //
 // --inline marks the page for an inline host (T3 Code html_render): it gets less padding.
 
@@ -91,27 +92,18 @@ function defaultSlug(html, file) {
   return `${slugPart(repo)}/${slugPart(name)}`;
 }
 
-async function cmdPublish() {
-  const slugFlag = flag('--slug'), share = has('--share'), asJson = has('--json'), src = rest[0];
-  const out = (code, obj, text) => { if (asJson) console.log(JSON.stringify(obj)); else console[code ? 'error' : 'log'](text); process.exit(code); };
-  if (!src) out(2, { error: 'usage' }, 'usage: agent-pages publish <page> [--slug group/name] [--share] [--json]');
+/** Prints the result as JSON or as text, then exits with the code. */
+const outFor = (asJson) => (code, obj, text) => { if (asJson) console.log(JSON.stringify(obj)); else console[code ? 'error' : 'log'](text); process.exit(code); };
+
+/** A client for the host API. A refusal or an error exits through out(). */
+function hostClient(out) {
   const host = (process.env.AGENT_PAGES_URL || '').replace(/\/+$/, '');
   const id = process.env.AGENT_PAGES_CLIENT_ID, secret = process.env.AGENT_PAGES_CLIENT_SECRET;
   if (!host) out(3, { error: 'AGENT_PAGES_URL is not set' }, 'error: set AGENT_PAGES_URL to the host, for example https://pages.example.com');
   const local = /^http:\/\/(localhost|127\.0\.0\.1)(:|$)/.test(host);
   if (!local && (!id || !secret)) out(3, { error: 'no service token' }, 'error: set AGENT_PAGES_CLIENT_ID and AGENT_PAGES_CLIENT_SECRET (a Cloudflare Access service token)');
-
-  let html = read(src);
-  if (!isPacked(html)) {
-    const r = lint(html, src);
-    if (report(r)) out(1, { error: 'check failed', errors: r.errs }, 'publish stopped: fix the errors first');
-    html = packHtml(html, false);
-  }
-  const slug = slugFlag || defaultSlug(html, src);
-  if (!/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?\/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/.test(slug)) out(2, { error: 'bad slug', slug }, `error: the slug "${slug}" must be group/name in lowercase letters, digits and hyphens`);
-
   const auth = id && secret ? { 'CF-Access-Client-Id': id, 'CF-Access-Client-Secret': secret } : {};
-  const call = async (method, path, body, type) => {
+  return async (method, path, body, type) => {
     let res;
     try { res = await fetch(host + path, { method, body, redirect: 'manual', headers: { ...auth, ...(type ? { 'content-type': type } : {}) } }); }
     catch (e) { out(1, { error: 'network', message: String(e.cause?.message || e.message) }, `error: cannot reach ${host}: ${e.cause?.message || e.message}`); }
@@ -122,10 +114,40 @@ async function cmdPublish() {
     if (!res.ok) out(1, { error: data.error || 'host error', status: res.status }, `error: the host answered ${res.status}: ${data.error || text.slice(0, 200)}`);
     return data;
   };
+}
+
+async function cmdPublish() {
+  const slugFlag = flag('--slug'), share = has('--share'), asJson = has('--json'), src = rest[0];
+  const out = outFor(asJson);
+  if (!src) out(2, { error: 'usage' }, 'usage: agent-pages publish <page> [--slug group/name] [--share] [--json]');
+  const call = hostClient(out);
+
+  let html = read(src);
+  if (!isPacked(html)) {
+    const r = lint(html, src);
+    if (report(r)) out(1, { error: 'check failed', errors: r.errs }, 'publish stopped: fix the errors first');
+    html = packHtml(html, false);
+  }
+  const slug = slugFlag || defaultSlug(html, src);
+  if (!/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?\/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/.test(slug)) out(2, { error: 'bad slug', slug }, `error: the slug "${slug}" must be group/name in lowercase letters, digits and hyphens`);
+
   const page = await call('PUT', `/api/pages/${slug}`, html, 'text/html; charset=utf-8');
   const result = { slug: page.slug, version: page.version, url: page.url, versionUrl: page.versionUrl };
   if (share) result.shareUrl = (await call('POST', `/api/pages/${slug}/shares`, JSON.stringify({ version: 'latest' }), 'application/json')).url;
   out(0, result, [`${page.url}  (v${page.version})`, result.shareUrl && `share: ${result.shareUrl}`].filter(Boolean).join('\n'));
+}
+
+/** Lists the pages, newest first, or the best match on each page for --search. */
+async function cmdList() {
+  const query = flag('--search'), asJson = has('--json');
+  const out = outFor(asJson);
+  const call = hostClient(out);
+  if (query) {
+    const hits = (await call('GET', `/api/search?q=${encodeURIComponent(query)}`)).map((h) => ({ slug: h.slug, title: h.title, repo: h.repo, heading: h.heading, snippet: h.snippet.replace(/[\u0002\u0003]/g, ''), url: h.url }));
+    out(0, hits, hits.length ? hits.map((h) => [`${h.title}  (${h.slug})`, h.heading && `  ${h.heading}`, `  ${h.snippet}`, `  ${h.url}`].filter(Boolean).join('\n')).join('\n\n') : `no page matches "${query}"`);
+  }
+  const pages = (await call('GET', '/api/pages')).map((p) => ({ slug: p.slug, title: p.title, repo: p.repo, version: p.latest, updated: p.updated_at, pinned: !!p.pinned_at, shared: p.shared > 0, url: p.url }));
+  out(0, pages, pages.length ? pages.map((p) => `${p.pinned ? '*' : ' '} v${String(p.version).padEnd(3)} ${p.updated.slice(0, 10)}  ${p.slug.padEnd(Math.max(...pages.map((x) => x.slug.length)))}  ${p.title}`).join('\n') : 'no pages yet');
 }
 
 // ─── Lint ───────────────────────────────────────────────────────────
@@ -253,4 +275,5 @@ else if (cmd === 'check') process.exit(report(lint(read(rest[0]), rest[0])) ? 1 
 else if (cmd === 'pack') cmdPack();
 else if (cmd === 'serve') cmdServe();
 else if (cmd === 'publish') cmdPublish();
-else { console.error('usage: agent-pages new <slug> [--title T] [--dir D] | check <page> | pack <page> [-o out] [--inline] | serve <page> [--port N] | publish <page> [--slug S] [--share] [--json]'); process.exit(2); }
+else if (cmd === 'list') cmdList();
+else { console.error('usage: agent-pages new <slug> [--title T] [--dir D] | check <page> | pack <page> [-o out] [--inline] | serve <page> [--port N] | publish <page> [--slug S] [--share] [--json] | list [--search Q] [--json]'); process.exit(2); }

@@ -2,12 +2,13 @@
 // and serves share links. See ../README.md for the routes and the auth model.
 import kitCss from '../../kit/explain.css?raw';
 import { verifyAccessJwt, type Identity } from './auth';
-import { blobKey, newToken, parseMeta, parseTheme, route, withTheme, type Theme } from './lib';
+import { blobKey, claimId, ftsQuery, newToken, pageChunks, parseMeta, parseTheme, route, thumbKey, withTheme, type Theme } from './lib';
 import { libraryHtml, messageHtml, sharedHtml, viewerHtml, type PageRow, type VersionRow } from './views';
 
 interface Env {
   DB: D1Database;
   PAGES: R2Bucket;
+  BROWSER: BrowserRun;
   ENVIRONMENT: string;
   ACCESS_TEAM: string;
   ACCESS_AUD: string;
@@ -51,16 +52,29 @@ function page(html: string, nonce: string, status = 200) {
   });
 }
 
+/** Gives each claim with no id the id that search links to, so /p/<slug>#claim-2 opens at that claim. */
+function withClaimIds(res: Response) {
+  let n = 0;
+  return new HTMLRewriter()
+    .on('section.k-claim', {
+      element(el) {
+        n++;
+        if (!el.getAttribute('id')) el.setAttribute('id', claimId(n));
+      },
+    })
+    .transform(res);
+}
+
 async function rawPage(obj: R2ObjectBody, immutable: boolean, theme: Theme | null) {
   const body = theme ? withTheme(await obj.text(), theme) : obj.body;
-  return new Response(body, {
+  return withClaimIds(new Response(body, {
     headers: {
       ...BASE_HEADERS,
       'content-type': 'text/html; charset=utf-8',
       'content-security-policy': PAGE_CSP,
       'cache-control': immutable ? 'private, max-age=31536000, immutable' : 'no-store',
     },
-  });
+  }));
 }
 
 const now = () => new Date().toISOString();
@@ -71,15 +85,79 @@ async function identify(req: Request, env: Env): Promise<Identity | null> {
   return verifyAccessJwt(req.headers.get('cf-access-jwt-assertion'), { team: env.ACCESS_TEAM, aud: env.ACCESS_AUD });
 }
 
+const PAGE_COLUMNS = 'slug, title, repo, latest, updated_at, pinned_at, thumb, (SELECT COUNT(*) FROM shares WHERE shares.slug = pages.slug) AS shared';
+
 async function getPage(env: Env, slug: string) {
-  return env.DB.prepare('SELECT slug, title, repo, latest, updated_at FROM pages WHERE slug = ?').bind(slug).first<PageRow>();
+  return env.DB.prepare(`SELECT ${PAGE_COLUMNS} FROM pages WHERE slug = ?`).bind(slug).first<PageRow>();
+}
+
+async function listPages(env: Env) {
+  const { results } = await env.DB.prepare(`SELECT ${PAGE_COLUMNS} FROM pages ORDER BY updated_at DESC`).all<PageRow>();
+  return results;
+}
+
+/** Replaces the page's search rows with the text of this version. The title goes only on the first row, so a title match opens the top of the page. */
+async function indexPage(env: Env, slug: string, title: string, html: string) {
+  const chunks = pageChunks(html);
+  if (chunks[0]?.anchor !== '') chunks.unshift({ anchor: '', heading: '', body: '' });
+  const insert = env.DB.prepare('INSERT INTO page_text (slug, anchor, title, heading, body) VALUES (?, ?, ?, ?, ?)');
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM page_text WHERE slug = ?').bind(slug),
+    ...chunks.map((c, i) => insert.bind(slug, c.anchor, i === 0 ? title : '', c.heading, c.body)),
+  ]);
+}
+
+/** Takes a light and a dark screenshot of the top of the page and stores them in R2. */
+async function makeThumbs(env: Env, slug: string, version: number, html: string) {
+  for (const theme of ['light', 'dark'] as const) {
+    const res = await env.BROWSER.quickAction('screenshot', {
+      html: withTheme(html, theme),
+      viewport: { width: 960, height: 600 },
+      // The kit fades each block in. Stop that, so the shot shows the finished page.
+      addStyleTag: [{ content: "*, *::before, *::after { animation: none !important; transition: none !important; }" }],
+      gotoOptions: { waitUntil: 'networkidle0', timeout: 20000 },
+      screenshotOptions: { type: 'webp', quality: 72 },
+      cacheTTL: 0,
+    });
+    if (!res.ok) throw new Error(`screenshot failed (${res.status}): ${(await res.text()).slice(0, 200)}`);
+    await env.PAGES.put(thumbKey(slug, version, theme), await res.arrayBuffer(), { httpMetadata: { contentType: 'image/webp' } });
+  }
+  await env.DB.prepare('UPDATE pages SET thumb = ? WHERE slug = ? AND COALESCE(thumb, 0) < ?').bind(version, slug, version).run();
+}
+
+/** Builds the search rows and the thumbnails for the latest version again. */
+async function refresh(env: Env, slug: string) {
+  const p = await getPage(env, slug);
+  if (!p) return fail(404, 'no such page');
+  const obj = await env.PAGES.get(blobKey(slug, p.latest));
+  if (!obj) return fail(404, 'no such version');
+  const html = await obj.text();
+  await indexPage(env, slug, p.title, html);
+  await makeThumbs(env, slug, p.latest, html);
+  return json({ slug, version: p.latest, indexed: true, thumb: true });
+}
+
+/** The best match on each page, best page first. The snippet marks matches with \u0002 and \u0003. */
+async function search(env: Env, q: string, origin: string) {
+  const match = ftsQuery(q);
+  if (!match) return json([]);
+  const { results } = await env.DB.prepare(
+    `SELECT page_text.slug AS slug, anchor, heading, snippet(page_text, -1, char(2), char(3), '…', 16) AS snippet, pages.title AS title, pages.repo AS repo
+     FROM page_text JOIN pages ON pages.slug = page_text.slug
+     WHERE page_text MATCH ? ORDER BY bm25(page_text, 0, 0, 10, 4, 1) LIMIT 200`,
+  )
+    .bind(match)
+    .all<{ slug: string; anchor: string; heading: string; snippet: string; title: string; repo: string | null }>();
+  const seen = new Set<string>();
+  const hits = results.filter((r) => !seen.has(r.slug) && seen.add(r.slug)).slice(0, 30);
+  return json(hits.map((h) => ({ ...h, url: `${origin}/p/${h.slug}${h.anchor ? `#${h.anchor}` : ''}` })));
 }
 
 async function getVersion(env: Env, slug: string, version: number) {
   return env.DB.prepare('SELECT version, sha, created_at FROM versions WHERE slug = ? AND version = ?').bind(slug, version).first<VersionRow>();
 }
 
-async function publish(req: Request, env: Env, slug: string, origin: string) {
+async function publish(req: Request, env: Env, ctx: ExecutionContext, slug: string, origin: string) {
   if (!(req.headers.get('content-type') || '').startsWith('text/html')) return fail(415, 'send the page as text/html');
   if (+(req.headers.get('content-length') || 0) > MAX_BYTES) return fail(413, 'the page is over 5 MB');
   const html = await req.text();
@@ -107,6 +185,9 @@ async function publish(req: Request, env: Env, slug: string, origin: string) {
   await env.DB.prepare('UPDATE pages SET latest = MAX(latest, ?), title = ?, repo = ?, updated_at = ? WHERE slug = ?')
     .bind(version, meta.title, meta.repo, at, slug)
     .run();
+  await indexPage(env, slug, meta.title, html);
+  // A thumbnail takes a few seconds. The library shows a placeholder until it exists.
+  ctx.waitUntil(makeThumbs(env, slug, version, html).catch((e) => console.error('thumbnail', slug, version, e)));
   return json({ slug, version, title: meta.title, url: `${origin}/p/${slug}`, versionUrl: `${origin}/p/${slug}/v/${version}` }, 201);
 }
 
@@ -120,6 +201,7 @@ async function deletePage(env: Env, slug: string) {
   } while (cursor);
   await env.DB.batch([
     env.DB.prepare('DELETE FROM shares WHERE slug = ?').bind(slug),
+    env.DB.prepare('DELETE FROM page_text WHERE slug = ?').bind(slug),
     env.DB.prepare('DELETE FROM versions WHERE slug = ?').bind(slug),
     env.DB.prepare('DELETE FROM pages WHERE slug = ?').bind(slug),
   ]);
@@ -156,7 +238,7 @@ async function resolveShare(env: Env, token: string) {
   return v ? { page: p, version: v } : null;
 }
 
-async function handle(req: Request, env: Env): Promise<Response> {
+async function handle(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   const url = new URL(req.url);
   const r = route(url.pathname);
   const nonce = newToken();
@@ -191,10 +273,8 @@ async function handle(req: Request, env: Env): Promise<Response> {
   switch (r.kind) {
     case 'kit-css':
       return css();
-    case 'library': {
-      const { results } = await env.DB.prepare('SELECT slug, title, repo, latest, updated_at FROM pages ORDER BY updated_at DESC').all<PageRow>();
-      return page(libraryHtml(results, nonce), nonce);
-    }
+    case 'library':
+      return page(libraryHtml(await listPages(env), nonce), nonce);
     case 'view': {
       const p = await getPage(env, r.slug);
       if (!p) return page(messageHtml('Page not found', `No page has the slug ${r.slug}.`, nonce), nonce, 404);
@@ -207,13 +287,27 @@ async function handle(req: Request, env: Env): Promise<Response> {
       const obj = await env.PAGES.get(blobKey(r.slug, r.version));
       return obj ? rawPage(obj, true, theme) : fail(404, 'no such version');
     }
-    case 'api-list': {
+    case 'api-list':
       if (method !== 'GET') return fail(405, 'method not allowed');
-      const { results } = await env.DB.prepare('SELECT slug, title, repo, latest, updated_at FROM pages ORDER BY updated_at DESC').all<PageRow>();
-      return json(results.map((p) => ({ ...p, url: `${url.origin}/p/${p.slug}` })));
+      return json((await listPages(env)).map((p) => ({ ...p, url: `${url.origin}/p/${p.slug}` })));
+    case 'api-search':
+      if (method !== 'GET') return fail(405, 'method not allowed');
+      return search(env, url.searchParams.get('q') || '', url.origin);
+    case 'api-pin': {
+      if (method !== 'PUT' && method !== 'DELETE') return fail(405, 'method not allowed');
+      const res = await env.DB.prepare('UPDATE pages SET pinned_at = ? WHERE slug = ?').bind(method === 'PUT' ? now() : null, r.slug).run();
+      return res.meta.changes ? new Response(null, { status: 204, headers: BASE_HEADERS }) : fail(404, 'no such page');
+    }
+    case 'api-refresh':
+      if (method !== 'POST') return fail(405, 'method not allowed');
+      return refresh(env, r.slug);
+    case 'thumb': {
+      const obj = await env.PAGES.get(thumbKey(r.slug, r.version, r.theme));
+      if (!obj) return fail(404, 'no such thumbnail');
+      return new Response(obj.body, { headers: { ...BASE_HEADERS, 'content-type': 'image/webp', 'cache-control': 'private, max-age=31536000, immutable' } });
     }
     case 'api-page':
-      if (method === 'PUT') return publish(req, env, r.slug, url.origin);
+      if (method === 'PUT') return publish(req, env, ctx, r.slug, url.origin);
       if (method === 'DELETE') return deletePage(env, r.slug);
       if (method === 'GET') {
         const p = await getPage(env, r.slug);
@@ -235,9 +329,9 @@ async function handle(req: Request, env: Env): Promise<Response> {
 }
 
 export default {
-  async fetch(req: Request, env: Env): Promise<Response> {
+  async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     try {
-      return await handle(req, env);
+      return await handle(req, env, ctx);
     } catch (e) {
       console.error(e);
       return fail(500, 'internal error');

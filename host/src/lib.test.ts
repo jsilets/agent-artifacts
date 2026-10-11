@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blobKey, isSlug, isToken, newToken, parseMeta, parseTheme, route, withTheme } from './lib';
+import { blobKey, ftsQuery, isSlug, isToken, newToken, pageChunks, parseMeta, parseTheme, plainText, route, thumbKey, withTheme } from './lib';
 
 describe('isSlug', () => {
   it('takes <group>/<name>', () => {
@@ -84,5 +84,44 @@ describe('withTheme', () => {
     expect(parseTheme('dark')).toBe('dark');
     expect(parseTheme('auto')).toBe(null);
     expect(parseTheme(null)).toBe(null);
+  });
+});
+
+describe('new routes', () => {
+  it('maps the pin, refresh, search and thumbnail routes', () => {
+    expect(route('/api/pages/a/b/pin')).toEqual({ kind: 'api-pin', slug: 'a/b' });
+    expect(route('/api/pages/a/b/refresh')).toEqual({ kind: 'api-refresh', slug: 'a/b' });
+    expect(route('/api/search')).toEqual({ kind: 'api-search' });
+    expect(route('/t/a/b/3/dark.webp')).toEqual({ kind: 'thumb', slug: 'a/b', version: 3, theme: 'dark' });
+    expect(route('/t/a/b/3/auto.webp')).toEqual({ kind: 'not-found' });
+    expect(thumbKey('a/b', 3, 'light')).toBe('pages/a/b/3.light.webp');
+  });
+});
+
+describe('ftsQuery', () => {
+  it('quotes each word and matches its prefix', () => {
+    expect(ftsQuery('Legis engine')).toBe('"legis"* "engine"*');
+  });
+  it('drops FTS syntax that the reader typed', () => {
+    expect(ftsQuery('"a" OR b* -c (d)')).toBe('"a"* "or"* "b"* "c"* "d"*');
+    expect(ftsQuery(' ** ')).toBe(null);
+  });
+});
+
+describe('pageChunks', () => {
+  const html = `<html><head><title>T</title><style>.x{}</style></head><body>
+<h1>How it works</h1><p>Intro &amp; scope.</p>
+<section class="k-claim"><h2>Bills arrive <em>hourly</em></h2><p>The poller reads the feed.</p></section>
+<section id="votes" class="k-claim c-blue"><h2>Votes</h2><p>Roll calls.</p><script>var no = 1;</script></section>
+</body></html>`;
+  it('splits the page at each claim and keeps or adds ids', () => {
+    expect(pageChunks(html)).toEqual([
+      { anchor: '', heading: '', body: 'How it works Intro & scope.' },
+      { anchor: 'claim-1', heading: 'Bills arrive hourly', body: 'The poller reads the feed.' },
+      { anchor: 'votes', heading: 'Votes', body: 'Roll calls.' },
+    ]);
+  });
+  it('decodes entities', () => {
+    expect(plainText('a&nbsp;&rarr;&#x42;&#67;')).toBe('a →BC');
   });
 });

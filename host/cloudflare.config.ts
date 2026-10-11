@@ -53,6 +53,9 @@ export default defineConfig(({ mode }: ConfigContext) => {
       env: {
         DB: bindings.d1(production ? { name } : { name: `${NAME}-development`, id: LOCAL_D1_ID }),
         PAGES: bindings.r2({ name: production ? name : `${NAME}-development` }),
+        // Browser Rendering takes the thumbnails at publish time. The local simulator has no
+        // screenshot action, so development uses the real service too.
+        BROWSER: bindings.browser({ dev: { remote: true } }),
         ENVIRONMENT: bindings.text(production ? 'production' : 'development'),
         ACCESS_TEAM: bindings.text(profile.accessTeam),
         ACCESS_AUD: bindings.text(profile.accessAud),

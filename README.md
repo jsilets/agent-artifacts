@@ -8,7 +8,7 @@ The repo has four parts:
 |---|---|
 | `skills/explain/` | The `explain` skill. It tells an agent how to choose the content of a page, which figure to use for each claim, and how to write the words. |
 | `kit/` | `explain.css` and `explain.js`: the look and the runtime that every page shares. |
-| `cli/` | `agent-pages`: `new`, `check`, `pack`, `serve` and `publish`. Node 18 or later, no dependencies. |
+| `cli/` | `agent-pages`: `new`, `check`, `pack`, `serve`, `publish` and `list`. Node 18 or later, no dependencies. |
 | `host/` | A Cloudflare Worker: the library, the viewer, the API and the share links. |
 
 ## Install the skill and the CLI
@@ -34,6 +34,8 @@ Without a host, the skill still works. Pages go to `~/.agent/explain/<repo>/`, a
 ## How the host works
 
 - R2 stores the HTML of each version at `pages/<group>/<name>/<version>.html`. D1 stores the page list, the versions and the share links.
+- At publish time, the Worker indexes the text of the page in a D1 FTS5 table, with one row for each claim. Browser Rendering takes a light and a dark screenshot of the top of the page, and R2 stores them as `pages/<group>/<name>/<version>.<theme>.webp`.
+- The raw route gives each `.k-claim` section with no id the id `claim-<n>`. A search result links to `/p/<group>/<name>#claim-<n>`, and the viewer passes the hash to the frame.
 - The viewer shows each page in an `<iframe>` with the `sandbox` attribute. The page HTML comes from a route that sends `Content-Security-Policy: sandbox`. So the script in a page runs with no origin, and it cannot read the host's cookies or call its API.
 - Cloudflare Access protects the whole hostname. A person signs in with Access. The CLI sends an Access service token.
 - The Worker checks the Access JWT on each request too. Access at the edge is the first check, and the Worker is the second.
@@ -41,11 +43,15 @@ Without a host, the skill still works. Pages go to `~/.agent/explain/<repo>/`, a
 
 | Route | Auth | Does |
 |---|---|---|
-| `GET /` | Access | The library, grouped by repo |
+| `GET /` | Access | The library: a grid or a list of thumbnails, pinned pages first, with a filter for each repo and full-text search |
 | `GET /p/<group>/<name>` | Access | The viewer for the latest version |
 | `GET /p/<group>/<name>/v/<n>` | Access | The viewer for one version |
 | `GET /raw/<group>/<name>/<n>` | Access | The page HTML, with the sandbox CSP |
+| `GET /t/<group>/<name>/<n>/<light or dark>.webp` | Access | A thumbnail |
 | `GET /api/pages` | Access | The page list as JSON |
+| `GET /api/search?q=<words>` | Access | The best match on each page, best page first |
+| `PUT`, `DELETE /api/pages/<group>/<name>/pin` | Access | Pin or unpin a page |
+| `POST /api/pages/<group>/<name>/refresh` | Access | Index the latest version and take its thumbnails again |
 | `PUT /api/pages/<group>/<name>` | Access | Store a new version. The body is the HTML. |
 | `DELETE /api/pages/<group>/<name>` | Access | Delete the page, its versions and its share links |
 | `GET`, `POST /api/pages/<group>/<name>/shares` | Access | List or make share links. POST body: `{ "version": n }` or `{ "version": "latest" }` |
@@ -63,7 +69,7 @@ You need a Cloudflare account, a zone for the hostname, and Cloudflare Zero Trus
    bun run test
    ```
 2. Copy `deploy.example.json` to `deploy.local.json`, and set `hostname` and `accessTeam`. Leave `accessAud` empty for now. Git ignores `deploy.local.json`. An optional `name` sets the name of the Worker, the D1 database and the R2 bucket. The default is `agent-pages`.
-3. Create the storage and apply the migration:
+3. Create the storage and apply the migrations:
    ```bash
    cf auth whoami                       # confirm the account
    cf d1 create --name agent-pages
@@ -92,7 +98,7 @@ You need a Cloudflare account, a zone for the hostname, and Cloudflare Zero Trus
    agent-pages publish skills/explain/examples/gallery.html --slug example/gallery
    ```
 
-To run the host locally, apply the migration to the local database and start Vite. Local mode has no Access check.
+To run the host locally, apply the migrations to the local database and start Vite. Local mode has no Access check. The local browser simulator cannot take screenshots, so local mode uses the real Browser Rendering service of the account that `cf` signs in to.
 
 ```bash
 bunx cf d1 migrations apply 00000000-0000-4000-8000-00000000a271 --local --persist-to .cloudflare/state --dir migrations
