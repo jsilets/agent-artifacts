@@ -7,9 +7,9 @@
 /* ─── Tokens ─────────────────────────────────────────────────────── */
 :root {
   color-scheme: light dark;
-  --bg: #ffffff;
-  --bg2: #f7f6f3;
-  --bg3: #efeee9;
+  --bg: #fcfbf8;
+  --bg2: #f4f2ec;
+  --bg3: #ebe9e2;
   --p: #1a1a1a;            /* primary text */
   --s: #73726c;            /* secondary text */
   --t: #9c9a92;            /* tertiary text */
@@ -28,12 +28,12 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #1a1a18;
-    --bg2: #2c2c2a;
-    --bg3: #222220;
-    --p: #e8e6de;
-    --s: #9c9a92;
-    --t: #73726c;
+    --bg: #141414;
+    --bg2: #262626;
+    --bg3: #1c1c1c;
+    --p: #ececec;
+    --s: #a0a0a0;
+    --t: #707070;
     --b: rgba(255, 255, 255, 0.14);
     --b2: rgba(255, 255, 255, 0.35);
     --link: #85B7EB;
@@ -42,8 +42,8 @@
 :root[data-theme="light"] { color-scheme: light; }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #1a1a18; --bg2: #2c2c2a; --bg3: #222220;
-  --p: #e8e6de; --s: #9c9a92; --t: #73726c;
+  --bg: #141414; --bg2: #262626; --bg3: #1c1c1c;
+  --p: #ececec; --s: #a0a0a0; --t: #707070;
   --b: rgba(255, 255, 255, 0.14); --b2: rgba(255, 255, 255, 0.35); --link: #85B7EB;
 }
 
@@ -61,7 +61,7 @@
 .c-red    { --fill: #FCEBEB; --line: #A32D2D; --ink: #791F1F; --sub: #A32D2D; }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .c-gray   { --fill: #444441; --line: #B4B2A9; --ink: #D3D1C7; --sub: #B4B2A9; }
+  :root:not([data-theme="light"]) .c-gray   { --fill: #3F3F3F; --line: #B4B4B4; --ink: #DCDCDC; --sub: #B4B4B4; }
   :root:not([data-theme="light"]) .c-purple { --fill: #3C3489; --line: #AFA9EC; --ink: #CECBF6; --sub: #AFA9EC; }
   :root:not([data-theme="light"]) .c-teal   { --fill: #085041; --line: #5DCAA5; --ink: #9FE1CB; --sub: #5DCAA5; }
   :root:not([data-theme="light"]) .c-coral  { --fill: #712B13; --line: #F0997B; --ink: #F5C4B3; --sub: #F0997B; }
@@ -71,7 +71,7 @@
   :root:not([data-theme="light"]) .c-amber  { --fill: #633806; --line: #EF9F27; --ink: #FAC775; --sub: #EF9F27; }
   :root:not([data-theme="light"]) .c-red    { --fill: #791F1F; --line: #F09595; --ink: #F7C1C1; --sub: #F09595; }
 }
-:root[data-theme="dark"] .c-gray   { --fill: #444441; --line: #B4B2A9; --ink: #D3D1C7; --sub: #B4B2A9; }
+:root[data-theme="dark"] .c-gray   { --fill: #3F3F3F; --line: #B4B4B4; --ink: #DCDCDC; --sub: #B4B4B4; }
 :root[data-theme="dark"] .c-purple { --fill: #3C3489; --line: #AFA9EC; --ink: #CECBF6; --sub: #AFA9EC; }
 :root[data-theme="dark"] .c-teal   { --fill: #085041; --line: #5DCAA5; --ink: #9FE1CB; --sub: #5DCAA5; }
 :root[data-theme="dark"] .c-coral  { --fill: #712B13; --line: #F0997B; --ink: #F5C4B3; --sub: #F0997B; }

@@ -143,7 +143,9 @@ svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width:
 
 /* ─── Library ───────────────────────────────────────────── */
 .h-bar { --bar: 44px; position: sticky; top: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 520px) minmax(0, 1fr); gap: 12px; padding: 0 8px 0 16px; }
-.h-brand { font: 600 13.5px/20px var(--sans); letter-spacing: -0.005em; }
+.h-brand { display: flex; align-items: center; gap: 6px; font: 600 13.5px/20px var(--sans); letter-spacing: -0.005em; }
+/* The mark without its tile: drawn in the text colour, so it inverts with the theme. The tile is for tabs and home screens. */
+.h-mark { width: 14px; height: 13px; fill: currentColor; stroke: none; }
 .h-search { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 9px 0 11px; border-radius: 999px; background: var(--bg2); color: var(--t); cursor: text; }
 .h-search:focus-within { background: var(--bg); box-shadow: inset 0 0 0 0.5px var(--b2), 0 0 0 3px color-mix(in srgb, var(--link) 18%, transparent); }
 .h-search svg { width: 15px; height: 15px; }
@@ -277,7 +279,11 @@ export interface PageRow {
  */
 export function libraryHtml(pages: PageRow[], nonce: string) {
   const body = `<header class="v-bar h-bar">
-  <span class="h-brand">Pages</span>
+  <span class="h-brand"><svg class="h-mark" viewBox="24 32 208 192" aria-hidden="true">
+    <path opacity="0.3" d="M84 32 H172 A16 16 0 0 1 188 48 V60 H68 V48 A16 16 0 0 1 84 32 Z"/>
+    <path opacity="0.55" d="M60 76 H196 A20 20 0 0 1 216 96 V104 H40 V96 A20 20 0 0 1 60 76 Z"/>
+    <path fill-rule="evenodd" d="M48 120 H208 A24 24 0 0 1 232 144 V200 A24 24 0 0 1 208 224 H48 A24 24 0 0 1 24 200 V144 A24 24 0 0 1 48 120 Z M64 148 H140 A12 12 0 0 1 140 172 H64 A12 12 0 0 1 64 148 Z"/>
+  </svg>Pages</span>
   <label class="h-search">${icon('search')}<input id="q" type="search" placeholder="Search pages" autocomplete="off" spellcheck="false" aria-label="Search pages"><kbd>/</kbd></label>
   <div class="h-tools">
     <div class="v-seg" role="group" aria-label="Layout">
