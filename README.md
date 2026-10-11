@@ -1,6 +1,6 @@
 # agent-pages
 
-agent-pages lets coding agents publish HTML pages to your own Cloudflare account. Each page has versions, a library lists every page, and a share link opens one page with no login. The first skill, `explain`, makes pages that explain things with pictures.
+agent-pages lets coding agents publish HTML pages to your own Cloudflare account. Each page has versions, a library lists every page, and a share link opens one page with no login.
 
 The repo has four parts:
 
