@@ -12,7 +12,7 @@
 //
 // --inline marks the page for an inline host (T3 Code html_render): it gets less padding.
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync, realpathSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync } from 'node:fs';
 import { dirname, join, resolve, basename } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { homedir } from 'node:os';
@@ -151,8 +151,8 @@ async function cmdList() {
 }
 
 // ─── Lint ───────────────────────────────────────────────────────────
-// Errors break the page or its rules. Warnings are budgets: fix them or accept them knowingly.
-const STE = { utilize: 'use', utilizes: 'uses', leverage: 'use', leverages: 'uses', facilitate: 'help', facilitates: 'helps', 'in order to': 'to', subsequently: 'then', 'prior to': 'before', additionally: 'also', furthermore: 'also', moreover: 'also', however: 'but', comprehensive: 'full', robust: 'strong', seamless: 'smooth', seamlessly: 'smoothly', numerous: 'many', commence: 'start', terminate: 'stop', demonstrate: 'show', demonstrates: 'shows', indicate: 'show', indicates: 'shows', ensure: 'make sure', ensures: 'makes sure', perform: 'do', performs: 'does', obtain: 'get', should: 'must or can', might: 'can', may: 'can', delve: 'look', crucial: 'important', essentially: '(cut it)', basically: '(cut it)', 'it is worth noting': '(cut it)', 'in conclusion': '(cut it)', 'in summary': '(cut it)', 'under the hood': 'inside', 'at the end of the day': '(cut it)' };
+// Errors identify invalid content or kit structure. Warnings request a contextual review.
+const STE = { utilize: 'use', utilizes: 'uses', leverage: 'use', leverages: 'uses', facilitate: 'help', facilitates: 'helps', 'in order to': 'to', subsequently: 'then', 'prior to': 'before', additionally: 'also', furthermore: 'also', moreover: 'also', however: 'but', comprehensive: 'full', robust: 'strong', seamless: 'smooth', seamlessly: 'smoothly', numerous: 'many', commence: 'start', terminate: 'stop', demonstrate: 'show', demonstrates: 'shows', indicate: 'show', indicates: 'shows', ensure: 'make sure', ensures: 'makes sure', perform: 'do', performs: 'does', obtain: 'get', delve: 'look', crucial: 'important', essentially: '(cut it)', basically: '(cut it)', 'it is worth noting': '(cut it)', 'in conclusion': '(cut it)', 'in summary': '(cut it)', 'under the hood': 'inside', 'at the end of the day': '(cut it)' };
 
 const strip = (s) => s.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<pre[\s\S]*?<\/pre>/gi, ' ').replace(/<code[\s\S]*?<\/code>/gi, ' X ').replace(/<[^>]+>/g, ' ').replace(/&[a-z]+;|&#\d+;/g, ' ').replace(/\s+/g, ' ').trim();
 const sentences = (t) => t.split(/(?<=[.!?])\s+(?=[A-Z0-9"“])/).map((s) => s.trim()).filter((s) => /\w/.test(s));
@@ -162,60 +162,40 @@ function lint(html, file) {
   const errs = [], warns = [];
   const err = (m) => errs.push(m), warn = (m) => warns.push(m);
 
-  // Where the page lives
-  try {
-    const dir = dirname(realpathSync(file));
-    const top = git(['rev-parse', '--show-toplevel'], dir);
-    if (top && !dir.startsWith(join(homedir(), '.agent')) && !dir.startsWith(realpathSync(join(KIT, '..')))) warn(`the page is inside the repo ${top}. Explain pages go in ${SCRATCH} unless the user asked to keep one in the repo`);
-  } catch {}
-
-  // Shape
-  if (!/<!--\s*SNAPSHOT:/.test(html)) err('missing the SNAPSHOT comment at the top. Start from "agent-pages new"');
+  // Kit structure. Source checkout metadata is optional for non-code documents.
   if (!/class="k-stamp"/.test(html)) err('missing the .k-stamp line under the h1');
   const stampText = html.match(/<p class="k-stamp"[^>]*>([\s\S]*?)<\/p>/i);
   if (stampText && /\b[0-9a-f]{7,40}\b/.test(stampText[1])) warn('the .k-stamp shows a commit hash. Readers do not need it; the SNAPSHOT comment keeps it for agents');
   const h1 = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
   if (!h1) err('missing the h1 title');
   const lede = html.match(/<p class="k-lede">([\s\S]*?)<\/p>/);
-  if (!lede) err('missing the .k-lede: the answer in one sentence');
-  else { const t = strip(lede[1]); if (/^The answer in one sentence\.?$/.test(t)) err('the .k-lede still holds the template text'); if (sentences(t).length > 2 || nwords(t) > 35) warn(`the lede has ${nwords(t)} words. Give the answer in one sentence`); }
+  if (!lede) err('missing the .k-lede: the answer or purpose of the page');
+  else { const t = strip(lede[1]); if (/^The answer (?:in one sentence|or purpose of the page)\.?$/.test(t)) err('the .k-lede still holds the template text'); if (sentences(t).length > 2 || nwords(t) > 35) warn(`the lede has ${nwords(t)} words. Consider shortening it while preserving the answer or purpose`); }
 
   const claims = [...html.matchAll(/<section class="k-claim[^"]*"[^>]*>([\s\S]*?)<\/section>/g)].map((m) => m[1]);
-  if (!claims.length) err('no <section class="k-claim">. The page is a list of claims, one figure each');
-  if (claims.length > 7) warn(`${claims.length} claims. Keep 7 at most: merge, cut, or move depth into <details class="k-more">`);
-  let prose = 0;
+  if (!claims.length) err('no <section class="k-claim">. Use kit sections for layout and host search');
   claims.forEach((c, i) => {
-    const no = `claim ${i + 1}`;
+    const no = `section ${i + 1}`;
     const h2 = c.match(/<h2[^>]*>([\s\S]*?)<\/h2>/);
-    if (!h2) { err(`${no}: no h2. The h2 is the claim`); return; }
+    if (!h2) { err(`${no}: no h2. Give the section a heading`); return; }
     const t = strip(h2[1]), w = nwords(t);
-    if (/^A takeaway sentence/.test(t)) err(`${no}: the h2 still holds the template text`);
-    if (w <= 3) warn(`${no}: "${t}" names a topic. Write the takeaway as a sentence that can be true or false`);
-    if (w > 16) warn(`${no}: the h2 has ${w} words. Keep a claim to about 12`);
-    if (/^(?:two|three|four|five|six|seven|2|3|4|5|6|7)\s/i.test(t)) warn(`${no}: "${t}" starts with a count. Keep the count only if it is the finding; otherwise state what the items have in common`);
-    if (/:\s/.test(t)) warn(`${no}: "${t}" has a colon. State the claim as one plain sentence`);
-    if (/,\s*(?:and|but)\s+only\b|\bnot just\b|\brather than\b|,\s*not\s/i.test(t)) warn(`${no}: "${t}" adds a second clause or a contrast. Keep the one fact that the figure proves`);
-    if (/;/.test(t) || (t.replace(/(\d),(\d)/g, '$1$2').match(/,/g) || []).length >= 2) warn(`${no}: "${t}" has several clauses. One heading states one fact`);
-    const top = c.replace(/<details[\s\S]*?<\/details>/g, '');
-    const figs = (top.match(/<figure[\s>]/g) || []).length;
-    if (figs === 0) err(`${no} "${t.slice(0, 50)}": no <figure>. Each claim gets one exhibit`);
-    if (figs > 1) warn(`${no} "${t.slice(0, 50)}": ${figs} figures. A second exhibit means a second claim`);
-    const paras = [...top.replace(/<figure[\s\S]*?<\/figure>/g, '').matchAll(/<p[^>]*>([\s\S]*?)<\/p>/g)].map((m) => strip(m[1]));
-    if (paras.length > 2) warn(`${no}: ${paras.length} paragraphs. Keep 2 at most; say the rest in the figure`);
-    paras.forEach((p) => { prose += nwords(p); if (sentences(p).length > 3) warn(`${no}: a paragraph has ${sentences(p).length} sentences. Keep 3 at most`); });
+    if (!t) err(`${no}: the h2 is empty`);
+    if (/^(?:A takeaway sentence|A useful takeaway or section heading)/.test(t)) err(`${no}: the h2 still holds the template text`);
+    if (/Replace this paragraph with the explanation\./.test(strip(c))) err(`${no}: the paragraph still holds the template text`);
+    if (w > 16) warn(`${no}: the h2 has ${w} words. Consider shortening it without losing its meaning`);
   });
-  if (claims.length && prose / claims.length > 70) warn(`prose outside figures averages ${Math.round(prose / claims.length)} words per claim. The figures must carry the page`);
 
   // Words
   const body = html.replace(/<!--[\s\S]*?-->/g, '').replace(/<head[\s\S]*?<\/head>/i, '');
-  const text = strip(body);
-  const proseEls = [...body.matchAll(/<(p|figcaption|li|h2|h3|td)[^>]*>([\s\S]*?)<\/\1>/g)].map((m) => strip(m[2]));
+  const authored = body.replace(/<(blockquote|q)\b[^>]*>[\s\S]*?<\/\1>/gi, ' ');
+  const text = strip(authored);
+  const proseEls = [...authored.matchAll(/<(p|figcaption|li|h2|h3|td)[^>]*>([\s\S]*?)<\/\1>/g)].map((m) => strip(m[2]));
   proseEls.flatMap(sentences).forEach((s) => { const w = nwords(s); if (w > 28) warn(`a sentence has ${w} words: "${s.slice(0, 70)}…"`); });
   if (/—/.test(text)) warn('the prose has an em dash. Write two sentences instead');
   const low = ' ' + text.toLowerCase() + ' ';
   const found = Object.keys(STE).filter((k) => new RegExp(`[^a-z]${k}[^a-z]`).test(low));
-  if (found.length) warn('words to replace: ' + found.map((k) => `"${k}" → ${STE[k]}`).join(', '));
-  if (/(?:→|->)[^<]{1,40}(?:→|->)/.test(text)) warn('the text has a chain of arrows. That is a flow: draw it with .k-flow');
+  if (found.length) warn('word suggestions (preserve meaning): ' + found.map((k) => `"${k}" → ${STE[k]}`).join(', '));
+  if (/(?:→|->)[^<]{1,40}(?:→|->)/.test(text)) warn('the text has a chain of arrows. Consider .k-flow if a diagram would clarify the sequence');
 
   // Look
   if (/style="[^"]*(?:color|background|font|border)/i.test(body)) warn('an inline style sets a color, font or border. Use the c-* classes and the kit components');
@@ -223,8 +203,8 @@ function lint(html, file) {
   [...body.matchAll(/<table[\s\S]*?<\/table>/g)].forEach((m, i) => {
     const cols = Math.max(0, ...[...m[0].matchAll(/<tr[\s\S]*?<\/tr>/g)].map((r) => (r[0].match(/<t[dh][\s>]/g) || []).length));
     const rows = (m[0].match(/<tr[\s>]/g) || []).length;
-    if (cols > 5) warn(`table ${i + 1} has ${cols} columns. Cut columns, or split it`);
-    if (rows > 16) warn(`table ${i + 1} has ${rows} rows. Group the rows, or put the tail in <details class="k-more">`);
+    if (cols > 5) warn(`table ${i + 1} has ${cols} columns. Check readability at narrow widths; split it if needed`);
+    if (rows > 16) warn(`table ${i + 1} has ${rows} rows. Consider grouping or navigation if readers cannot find the needed values`);
   });
 
   // Flows
@@ -232,8 +212,8 @@ function lint(html, file) {
     const f = E.parseFlow(E.dedent(m[1]));
     f.errors.forEach((e) => err(`flow ${i + 1}: ${e}`));
     const n = Object.keys(f.nodes).length;
-    if (n > 12) warn(`flow ${i + 1} has ${n} nodes. Keep 12 at most: split it, or group parts`);
-    if (f.edges.length && f.edges.filter((e) => !e.label).length > f.edges.length / 2) warn(`flow ${i + 1}: most arrows have no label. Label each arrow with a verb: "writes", "polls every 15 min"`);
+    if (n > 12) warn(`flow ${i + 1} has ${n} nodes. Check label readability; split or group parts if needed`);
+    if (f.edges.length && f.edges.filter((e) => !e.label).length > f.edges.length / 2) warn(`flow ${i + 1}: most arrows have no label. Add labels where an action or condition is unclear`);
     if (!f.errors.length && n) { const L = E.layoutFlow(f); if (L.W > 1100) warn(`flow ${i + 1} is ${Math.round(L.W)}px wide and will shrink a lot. Use dir TB, a grid, or shorter labels`); }
   });
 

@@ -6,7 +6,7 @@ The repo has four parts:
 
 | Folder | What it holds |
 |---|---|
-| `skills/explain/` | The `explain` skill. It tells an agent how to choose the content of a page, which figure to use for each claim, and how to write the words. |
+| `skills/explain/` | The `explain` skill creates HTML explanations, lessons, documents, and presentations. It guides content, emphasis, and the choice of prose, tables, charts, or diagrams within each page. |
 | `kit/` | `explain.css` and `explain.js`: the look and the runtime that every page shares. |
 | `brand/` | The mark. `mark.svg` is the master, `mark-small.svg` is the cut for 16 to 32 px with thicker parts and a bolder heading line (the favicon), and `mark-square.svg` is for platforms that round the corners. `favicon.ico` and `apple-touch-icon.png` are rendered from them. |
 | `cli/` | `agent-pages`: `new`, `check`, `pack`, `serve`, `publish` and `list`. Node 18 or later, no dependencies. |

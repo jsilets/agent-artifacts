@@ -1,6 +1,8 @@
 # Exhibits
 
-The markup for each exhibit. `examples/gallery.html` shows all of them on one page. Every exhibit goes inside a `<figure>` with a one-sentence `<figcaption>`.
+The markup for kit components. `examples/gallery.html` shows them on one page. Wrap a self-contained exhibit in `<figure>` with a useful `<figcaption>`. Prose, lists, and reference tables can stand outside figures. Select components by the reader's task, not by item counts.
+
+Use components to expose relationships and make comparisons easy to scan. Keep diagrams that save the reader from reconstructing connections across paragraphs. A supporting value often belongs in an existing label, caption, cell, or sentence. The gallery demonstrates available components; it is not a checklist for each page.
 
 Color ramps: `c-gray c-purple c-teal c-coral c-pink c-blue c-green c-amber c-red`. Put a ramp class on a node, card, layer, chip, stat, bar or callout. Dark mode is automatic.
 
@@ -8,14 +10,14 @@ Color ramps: `c-gray c-purple c-teal c-coral c-pink c-blue c-green c-amber c-red
 
 ```html
 <header>
-  <h1>How the engine moves data</h1>                  <!-- a title, 3 to 7 words -->
+  <h1>How the engine moves data</h1>
   <p class="k-stamp">repo · Oct 10, 2026</p> <!-- "new" fills it in -->
-  <p class="k-lede">The answer in one sentence.</p>
+  <p class="k-lede">The answer or purpose of the page.</p>
 </header>
 <section class="k-claim">
-  <h2>A claim that can be true or false.</h2>
-  <figure> …one exhibit… <figcaption>What to notice.</figcaption></figure>
-  <p class="k-note">Optional: 1 or 2 sentences the figure cannot show.</p>
+  <h2>A useful takeaway or section heading.</h2>
+  <p>The explanation can stand alone or introduce supporting exhibits.</p>
+  <!-- Add figures only when they help the reader understand this section. -->
   <details class="k-more"><summary>Optional depth</summary> … </details>
 </section>
 ```
@@ -34,7 +36,7 @@ The runtime lays out and draws the diagram. You write a text spec. You never com
   - old = Old cron [gray]                 // marks: + new, - gone, ~ changed, ! highlight
     Runs at 02:00 only.                   // an indented line is detail, shown on hover
   src -> col : polls every 15 min         // -> solid · --> dashed (sometimes) · => bold (main path)
-  col -> db : upserts                     // <-> two-way · label after the colon: a verb
+  col -> db : upserts                     // <-> two-way · label after the colon: action or condition
   col --> q : on new video
   group "Ingest": src col                 // dashed box around nodes
 </script></div>
@@ -47,7 +49,9 @@ The runtime lays out and draws the diagram. You write a text spec. You never com
   | .   | q   | .  |
   ```
 - If arrow labels collide or sit far from their arrows, place the nodes with grid rows. A grid almost always fixes it.
-- 12 nodes at most. About 18 characters for a label line and 24 for a subtitle; the layout wraps longer text.
+- Above 12 nodes, the lint suggests splitting or grouping the flow. Treat this as a readability check, not a fixed limit.
+- Label arrows when the action or condition would otherwise be unclear. The lint warns when most arrows have no label.
+- Aim for about 18 characters for a label line and 24 for a subtitle; the layout wraps longer text.
 
 ## .k-layers: parts and owners
 
@@ -71,7 +75,7 @@ Order the layers from the user down to the storage.
 
 The runtime adds Back and Next buttons, the arrow keys and a "1 / 3" counter. A step can hold a small `.k-flow` that shows that stage.
 
-## .k-grid: 2 to 5 cases, compared
+## .k-grid: cases with matching structure
 
 ```html
 <div class="k-grid">
@@ -82,7 +86,7 @@ The runtime adds Back and Next buttons, the arrow keys and a "1 / 3" counter. A 
 
 Give each card the same parts in the same order. A card without a ramp class is neutral.
 
-## .k-table: 6 or more rows
+## .k-table: values or attributes to compare
 
 ```html
 <div class="k-scroll"><table class="k-table">
@@ -91,7 +95,7 @@ Give each card the same parts in the same order. A card without a ramp class is 
 </table></div>
 ```
 
-5 columns at most. Cells hold values, not sentences. Right-align numbers with `class="num"`.
+Use a table even for a small comparison when matching columns help the reader. Keep cells concise; short sentences are valid. Right-align numbers with `class="num"`. The lint flags more than 5 columns or 16 rows for a layout review, not automatic removal.
 
 ## .k-scale: a score for each item
 
@@ -102,7 +106,7 @@ Give each card the same parts in the same order. A card without a ramp class is 
 </div>
 ```
 
-Three cells for each row: the item, the score and one reason. Say in the caption what the score measures.
+Three cells for each row: the item, the score and one reason. Define the scoring criteria and the source of each score. Use prose when a numeric score would imply unsupported precision.
 
 ## .k-stats and .k-bars: numbers
 
@@ -116,7 +120,7 @@ Three cells for each row: the item, the score and one reason. Say in the caption
 </div>
 ```
 
-`--v` is the bar length from 0 to 100. This is the one inline style that the lint accepts.
+`--v` is the bar length from 0 to 100. Use the same scale for comparable bars and show units. A stat tile emphasizes a value; bars show comparisons. A number can also stay in prose or a table.
 
 ## .k-model: inputs the reader moves
 
@@ -161,11 +165,11 @@ sequenceDiagram
 </pre>
 ```
 
-The runtime loads Mermaid from a CDN and colors it from the kit. Use `.k-flow` for every other diagram.
+The runtime loads Mermaid from a CDN and colors it from the kit. Prefer `.k-flow` for supported flows. Use custom SVG when the subject needs different geometry.
 
 ## Hand-drawn SVG: only when no exhibit fits
 
-Use it for a picture with its own geometry, such as a timeline with real dates or a physical layout. These rules come from OpenIntelligentUI.
+Use it for a chart or diagram with its own geometry, such as a timeline with real dates or a physical layout. These layout defaults come from OpenIntelligentUI. Adapt the dimensions when needed and inspect the result.
 
 - `<svg viewBox="0 0 680 H" width="100%">`. Keep content between x=40 and x=640. H is the lowest element's bottom edge plus 40.
 - Boxes: `<g class="c-teal"><rect class="box" … rx="8"/><text class="th" …>Title</text><text class="ts" …>subtitle</text></g>`.

@@ -116,6 +116,8 @@ strong, b { font-weight: 600; }
 .k-claim > p:first-of-type:not(.k-note) { color: var(--p); }
 
 figure { margin: 0; min-width: 0; }
+/* Separate exhibits from introductory text without adding space below headings. */
+.k-claim > :is(p, ul, ol) + :is(figure, .k-scroll) { margin-top: 16px; }
 figcaption { font-size: 13px; color: var(--s); margin-top: 8px; }
 .k-scroll { overflow-x: auto; }
 
@@ -193,7 +195,7 @@ svg .mark-hl .box { stroke-width: 2.25; }
 .k-dots i { width: 10px; height: 10px; border-radius: 50%; border: 1px solid var(--line, var(--s)); display: inline-block; }
 .k-dots i.on { background: var(--line, var(--s)); }
 
-/* ─── Bars and stats: every number gets a picture ────────────────── */
+/* ─── Bars and stats: comparisons and highlighted values ─────────── */
 .k-bars { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto; gap: 8px 12px; align-items: center; }
 .k-bars > b { font-size: 14px; font-weight: 500; }
 .k-bars > span { height: 10px; border-radius: 5px; background: var(--bg3); overflow: hidden; }

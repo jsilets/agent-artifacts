@@ -1,185 +1,102 @@
 ---
 name: explain
-description: Explain a system, a concept or a result to the user with pictures first and few words. Use when the user asks how something works, for an overview or architecture, to explain or teach a concept, to compare options, or to show results; and whenever an answer would need more than about 5 sentences, a table of 4+ rows, or numbers that depend on inputs. Gives a ladder from a plain answer, to one Mermaid block in chat, to one HTML page drawn with a fixed kit and shown inline in T3 Code.
+description: Create Agent Pages HTML explanations, lessons, documents, and presentations for a stated audience. Choose prose, tables, charts, diagrams, and interactive examples within the page by the reader's task. Use for explaining concepts or systems, teaching unfamiliar material, comparing options, and preparing material for others to read.
 ---
 
 # explain
 
-The user reads pictures faster than paragraphs. Your default is a wall of text. This skill replaces that default.
+Create the explanation as an HTML page with the Agent Pages kit. Choose its content, emphasis, and then the form of each part. A short explanation can be a short page of prose. Honor an explicit request for another output format.
 
-```
-<this skill's directory>/
-  references/exhibits.md   ← the markup for each exhibit. Read it before you write a page.
-  examples/gallery.html    ← every exhibit on one page. Copy its parts.
-agent-pages            ← the CLI on PATH: new · check · pack · serve · publish
-```
+## Start with the reader
 
-The CLI and the kit (`kit/explain.css`, `kit/explain.js`) live in the agent-pages repo. Every page links the kit. Never restyle the kit in a page.
+Infer the audience, prior knowledge, and purpose from the request. Ask only when missing information would materially change the result. Adapt the page to its use:
 
-## 1. Pick the lightest output that works
+- **Teaching.** Explain necessary terms and the mechanism. Use a concrete example when it helps. An extended lesson can include a practice question with an answer the reader can check.
+- **Documents.** Include the context, evidence, decisions, and required actions an independent reader needs. Preserve an existing outline unless restructuring is requested or necessary.
+- **Presentations.** For a live talk, keep each slide focused and put supporting detail in notes. A deck read alone needs enough explanation without a presenter. Follow the requested template.
 
-| The answer is | Give |
+A shared page must make sense without this chat. Keep essential context in the page and production details out of it.
+
+## Choose content and emphasis
+
+Separate facts, assumptions, illustrative examples, and recommendations. Cite evidence where readers need to verify a claim. Do not invent data or present an illustration as a measurement.
+
+Give the main answer the most prominence. Keep prerequisites, examples, and caveats when they help the reader understand or apply it. Cut incidental details that do not affect accuracy or action.
+
+A separate paragraph, heading, card, chart, or diagram gives a point extra emphasis. Match that emphasis to its importance. Reduce oversized treatment of minor facts while preserving visuals that make the main explanation easier to understand. A complex central idea can deserve several diagrams and substantial prose. A supporting fact often needs only a sentence, label, caption, or table cell.
+
+For example, a service's 15-minute refresh interval can be one label in a system overview. A separate paragraph and large "15 min" card would overemphasize it. A lesson about stale results can justify a timeline of source changes and refreshes. Label example times as illustrative. Omit the interval from installation instructions if it affects neither a step nor an expected result.
+
+## Choose the form within the page
+
+Use visuals to make relationships visible and comparisons easy to scan. Prefer a diagram when prose would make the reader reconstruct connections, sequence, or branches. Replacing a useful diagram with several paragraphs increases the reader's work. Keep the visual and use prose for the meaning, reasons, and conditions it cannot convey clearly.
+
+| Reader's task | Useful form |
 |---|---|
-| One fact, a yes or no, a command, or code | Plain text. 5 sentences at most. |
-| One relationship: a flow, a sequence, a state change | One ```` ```mermaid ```` block in chat and 1 or 2 sentences. T3 Code draws it. |
-| Two or more ideas, numbers, a comparison, or anything the user must explore | A page from the kit (sections 2 to 7). |
+| Understand a definition, reason, or trade-off | Prose with an example when needed. |
+| Follow instructions | A numbered list, with a diagram where location or movement matters. |
+| Look up values or compare matching attributes | A table, including small comparisons. |
+| See magnitude, share, or change over time | A chart with units, labels, and an appropriate scale. |
+| Understand connections, sequence, or state | A diagram with enough text to explain its meaning. |
+| Explore how an input affects a result | An interactive model with visible assumptions and limits. |
 
-If you are not sure, ask yourself: "Would a good engineer draw this on a whiteboard?" If yes, do not answer in text.
+A number can stay in a sentence. A large number tile highlights a value but does not show a comparison. Add interaction only when changing an input helps answer a real question. Use precise terms such as table, chart, and diagram.
 
-## 2. Decide what the reader needs
+For a system overview, start with a connected map of the main paths. Show how separate detail views connect to that map. Use a compact source table for what each input provides. Put supporting timing rules, code references, and failure mechanics in expandable details when the main explanation does not need them. Keep essential conditions visible. Avoid paragraphs inside table cells that obscure the comparison.
 
-Choose the content before the form. A page that shows the wrong points in a good layout is still a bad page.
+## Write clearly and preserve meaning
 
-1. Name the reader and the one question. Example: "The user wants to know how the service gets its data and what it can predict." If the user did not say, infer it from the request and the conversation. Ask only if two readings give different pages.
-2. List every candidate point: from the code, from the conversation, and from any earlier page or doc on the topic.
-3. Give each point one role:
+Use common words, consistent terms, and complete sentences. Define unfamiliar technical terms before the reader needs them. Lead paragraphs with their main point, then add supporting evidence or reasoning. Connect related ideas and remove empty emphasis.
 
-| Role | Where it goes |
-|---|---|
-| The reader needs it to answer the question | A claim |
-| It supports one claim | Inside that claim's figure, or in `k-more` under it |
-| It is a single fact | One sentence: in the chat reply, or inside a claim. Never its own section. |
-| The user must decide it | A question in the chat reply. Never a page section. |
-| It is not about the question | Cut it |
+Apply ASD-STE100 sentence principles, not a restrictive word list. Put one idea in each sentence. Aim for about 20 words for an instruction and 25 for a description. Use active voice and simple tenses that preserve timing. Sentence lengths and readability scores are review aids, not correctness tests.
 
-4. Give space by weight. The point that answers the question gets the first claim and the largest figure. A minor point never gets the same size as a major one.
-5. Do the cut test on each claim: "If I delete this, can the reader still answer the question?" If yes, delete it.
+Preserve uncertainty, conditions, and obligation. "Might fail", "can fail", and "must fail" mean different things. Keep quotations, code, identifiers, and technical names exact. Check rewrites against their source; do not add causes, outcomes, measurements, or guarantees to make the writing sound concrete. Verify a necessary missing fact or identify the gap.
 
-Decisions that you own, such as how to store an export, are not for the reader. Leave them out of the page.
+Prefer takeaway headings, such as "Only the API writes to Postgres." Question or topic headings can suit navigation and reference material. Do not pad a heading to meet a word count.
 
-When you redo an existing page or doc, do not keep its outline. Start again from the question. In the chat reply, list what you cut in one line, so the user can ask for any of it back.
+## Remove repetition across the whole page
 
-## 3. Write the claims
+Give each fact a primary place. Review headings, prose, tables, diagrams, captions, and summaries together. Cut restatements that add no reasoning, evidence, condition, or useful application. A change of wording or format does not make a repeated point new.
 
-A page is a list of claims. Each claim is a sentence that can be true or false. Each claim gets exactly one exhibit.
+Let each element do a distinct job. A heading can state the finding, a chart show its evidence, and a caption identify its source or limits. Do not routinely narrate every label or table row in prose. Repeat only for a concrete reader need, such as accessible text, a condition at the point of action, or an independently read summary. Keep that repetition brief. A worked example should teach the reader how to apply the idea.
 
-1. Write the lede: the answer to the user's question in one sentence.
-2. Write 2 to 7 claims as `h2` sentences. "Only the API writes to Postgres." Not "Database layer".
-3. Read the lede and the claims aloud, in order, with nothing else. They must tell the whole answer. If they do not, fix them now. Do not start the exhibits until they do.
-4. Put depth that only some readers need in `<details class="k-more">` under a claim.
+For example, keep a tax-column omission risk in the risk paragraph. Put the measured export times and test limits in the evidence table. Remove table rows that merely repeat the risk paragraph. A short recommendation can refer to the risk without restating the evidence list.
 
-Order the claims from the outside in. First what the user can see or do, then how it works, then where it is in the code (`<span class="k-path">file:line</span>`).
+## Review the result
 
-## 4. Pick one exhibit for each claim
+Scan the rendered page before reading every paragraph. Can a reader find the main answer, trace the relevant relationships, and compare the important differences? Check whether prose has replaced a clearer diagram or table. Then read the full page as someone without this conversation. Verify meaning, evidence, conditions, and accessible equivalents. Remove repetition and move supporting detail out of the main reading path. A page without overflow can still be hard to understand.
 
-The question that the claim answers picks the exhibit. The markup for each one is in `references/exhibits.md`.
+For substantial work, use a separate reader review when available and appropriate. Give the reviewer the page and realistic questions without the conversation or intended answers. Check factual fidelity, comprehension, and emphasis, not just style adherence. Self-review is not an independent reader test.
 
-| The claim answers | Exhibit | Do not use |
-|---|---|---|
-| How does data or control move? | `.k-flow`. Label every arrow with a verb: "writes", "polls every 15 min". | A row of boxes with "→" between them |
-| What are the parts, and which part owns what? | `.k-layers`, or `.k-flow` with `group` | A table of components |
-| What happens in order, stage by stage? | `.k-steps`, or `.k-flow` with `dir LR` | A numbered list of paragraphs |
-| How do 2 to 5 cases differ? | `.k-grid` of `.k-card`: the same parts on each card | A table of sentences |
-| How do 6 or more items compare on the same columns? | `.k-table` with `.k-chip` status, 5 columns at most | Long text in the cells |
-| How good or how ready is each item? | `.k-scale` with `data-score="3/5"` and one reason for each row | Adjectives |
-| How big is a number, or how do numbers compare? | `.k-stats` or `.k-bars`. Every number gets a picture. | A number inside a sentence |
-| How does the result change when an input changes? | `.k-model` with sliders. Use it only when the reader has a real input to move. | A table of scenarios |
-| Who calls whom, in what order, with replies? | `<pre class="mermaid">sequenceDiagram` | A flow with numbered arrows |
-| What states does a thing have? | `<pre class="mermaid">stateDiagram-v2` | Prose |
-| What is the one fact the reader must not miss? | `.k-callout` | Bold text in a paragraph |
+## Make, check, and show the HTML
 
-Rules for every exhibit:
-- Draw the mechanism, not the name. A box that says "cache" teaches nothing. A request that goes through the cache and back teaches.
-- Use 2 or 3 color ramps in one figure. Color shows meaning, and it is the same meaning on the whole page.
-- Status colors are fixed: `c-green` is live or done, `c-amber` is partial, `c-gray` is not built, `c-red` is broken.
-- A flow has 12 nodes at most. If it needs more, split it into an overview and a zoom.
-- One exhibit can combine kit parts that show one thing, such as `.k-stats` above `.k-bars` for the same numbers. Two figures that show two things are two claims.
-- A number in a note is fine when it is a condition or a date. A number that is the point gets a picture.
-- Use only the kit classes. Do not set colors, fonts or sizes in a page. A page with its own `<style>` block is wrong unless the kit cannot draw the figure. For that case, see the SVG rules in `references/exhibits.md`.
+Read [references/exhibits.md](references/exhibits.md) for markup and consult [examples/gallery.html](examples/gallery.html) for component examples. The CLI and `kit/explain.css` and `kit/explain.js` live in the Agent Pages repo.
 
-## 5. Write the words
+Use the kit for consistent appearance. Add custom styling only for a needed chart or diagram the kit cannot express. Keep colors consistent, labels readable, and status understandable without color. Give diagrams a textual equivalent.
 
-The figures carry the page. The words say what each figure proves, in the plain way an engineer briefs a colleague.
-
-### Headings
-
-Each `h2` is the answer to one question: "What does this figure show?"
-
-- Write one sentence of 6 to 12 words that states one fact.
-- Make a real part the subject, with the name it has in the code and in the figure. Use a plain verb.
-- Put the specific fact in the heading: a name, a number, a limit, a direction or a condition.
-- Use a count only when the count is the finding. Otherwise, state what the items have in common.
-- Use only the specific words that also appear in the figure.
-- Test each heading: "Could this heading go on a page about a different system without a change?" If yes, replace it with the most specific fact that the figure shows.
-
-These headings follow the rules. Each one comes from the figure under it:
-
-<examples>
-Figure: a flow from the browser to the edge and KV, with a dashed path to the API and Postgres.
-Heading: "A click reaches Postgres only when the edge cache misses."
-
-Figure: three bands. Only the API band says "reads and writes".
-Heading: "Only the Links API writes to Postgres."
-
-Figure: a table of four routes with calls per day. GET /:id has 2,400,000 of 2,421,140.
-Heading: "GET /:id carries 99% of all requests."
-
-Figure: a stepper from the API write to the edge cache.
-Heading: "A new link reaches every edge within 60 seconds."
-
-Figure: a slider model of hit rate against average redirect time.
-Heading: "At a 94% hit rate, the average redirect takes 7.1 ms."
-</examples>
-
-### Captions, notes and the lede
-
-- The lede answers the reader's question in one sentence.
-- A `figcaption` is one sentence that tells the reader where to look and what they see there.
-- A note under a figure is 1 or 2 sentences. It says only what the figure cannot show, such as a cause or a condition.
-- When a sentence describes the picture, make it a label in the picture.
-- The page holds the lede, the claims and the figures. The claims, read in order, are the summary.
-
-### Every sentence
-
-Write in ASD-STE100 Simplified Technical English. Put one idea in each sentence. Use at most 20 words for an instruction and 25 for a description. Use active voice and the present tense. Use the same term for the same thing each time, and use the plainest common word for everything that is not a technical name.
-
-### Rewrite pass
-
-When the page is complete, do one more pass on the words only. For each claim, look at its figure and answer "What does this figure show?" in one sentence. If your answer differs from the `h2`, the answer becomes the new `h2`. Then run `check`, which also flags common problems in headings.
-
-## 6. Where the page goes: a snapshot, not a document
-
-An explain page shows the code at one commit on one date. It goes stale the next day. Agents that find a stale page in a repo read it as a plan or as the truth. So:
-
-- `agent-pages new <slug>` writes the page to `~/.agent/explain/<repo>/<date>-<slug>.html`. That folder is outside every repo. This is the default.
-- Write a page into a repo only when the user asks for that. Then the page keeps its `SNAPSHOT` comment and its `.k-stamp` line, which tell agents not to plan from it.
-- Never write "next steps", "TODO" or "not built yet, build this next" as a claim. To show what does not exist, use a `c-gray` "not built" chip, and state it as a fact of that commit.
-- When a decision is worth keeping, it does not go in the page. Tell the user, and offer to record it as an ADR or in `CONTEXT.md`.
-
-## 7. Make, check, look, show
+Use `<section class="k-claim">` with an `h2` for each content section. The class supports layout, search, and host links. A section can hold prose, lists, tables, or multiple supporting exhibits. Wrap a self-contained exhibit in `<figure>` with a useful `<figcaption>`.
 
 ```bash
-agent-pages new engine-overview --title "How the engine moves data"   # prints the path
-# write the page: claims first, then exhibits
-agent-pages check <page>               # errors stop you; warnings are budgets
-agent-pages pack <page> --inline       # one file, under 512 KB; writes <page>.packed.html
-agent-pages publish <page>             # sends the page to the host; prints its URL
+agent-pages new engine-overview --title "How the engine moves data"
+# Replace the template text with the explanation.
+agent-pages check <page>
+agent-pages pack <page> --inline
 ```
 
-1. Run `check`. Fix every error. Fix each warning, or keep it only if you can say why.
-2. Look at the page before the user does.
-   - In T3 Code, call `html_preview` with the packed HTML. Read the screenshot, the console output and `contentHeight`.
-   - Without `html_preview`, run `agent-pages serve <packed page>` in the background, then use `preview_open` and `preview_snapshot`.
-   - Check that no label is clipped, no arrow crosses a label, and nothing overflows at 390 px wide. Check dark mode too.
-3. Show the page.
-   - In T3 Code, call `html_render` with the packed HTML, a title, and `contentHeight` as the height. The page appears above your reply.
-   - Without `html_render`, give the path and open it in the preview.
-4. Publish the page with `agent-pages publish <page>`. Give the unpacked page, because `publish` packs it for the host. Publish every page, and publish it again after each change: each publish makes a new version of the same slug. Put the URL that it prints in the reply.
-   - Make a share link (`--share`) only when the user asks for one. A share link lets anyone read the page with no login.
-   - If `publish` exits with code 3, the host or its credentials are not set. Say so in the reply, and do not retry.
-5. The chat reply is 1 or 2 sentences that add what the page does not say. After them, add the one-line list of cuts (for a redo) and the questions for the user. Do not announce the page, and do not repeat it.
-6. If you cannot get a screenshot, say so in the reply. Do not claim that you checked the look.
+`new` defaults to `~/.agent/explain/<repo>/<date>-<slug>.html`. Use the requested destination when specified. A lasting document can live in its repository.
 
-## Before you show it
+Keep the template's `SNAPSHOT` comment for code explanations; it records the source checkout at creation. Verify mutable facts before reusing an old page. Remove the comment when that checkout is unrelated to the content. Set `.k-stamp` to a relevant project or topic and date. Identify draft status or review dates when useful.
 
-```
-□ every claim passes the cut test; single facts and decisions are in the chat, not in sections
-□ the lede answers the question in one sentence
-□ the claims, read alone, tell the whole answer
-□ each claim has exactly one figure, and the figure proves the claim
-□ every arrow has a verb; every number has a picture
-□ no prose paragraph repeats what a figure shows
-□ check passes; you looked at the screenshot in light and dark mode
-□ the page is in ~/.agent/explain, unless the user asked for the repo
-□ the page is published, and the reply gives its URL; no share link unless the user asked
-```
+Fix `check` errors. Review warnings in context; lint does not judge factual accuracy or teaching quality. `pack` inlines the kit and enforces a 512 KB limit. Mermaid still loads its renderer from a CDN.
+
+Inspect the packed page with the available browser tools. In T3 Code, start with `preview_status`, then `preview_open` when needed. Run `agent-pages serve <packed page>` and navigate to its URL. If inline preview and rendering tools are available, use their documented interfaces.
+
+Check labels, arrows, overflow, and controls at desktop and narrow mobile widths, including 390 px, in light and dark modes. Test representative and boundary inputs in interactive models. State unavailable checks; do not claim visual inspection from lint results. Show the page through the preview or a file link. Keep the chat handoff to its location, material limitations, and any needed user action.
+
+## Publish and share
+
+Follow the user's established publishing preference. If private publication is already authorized, publish completed pages and completed revisions without asking again. Otherwise, keep the artifact local until publication is requested. Intermediate edits do not each need an upload.
+
+Use `agent-pages publish <page>` with the unpacked file; the command packs it for the host. Include the returned URL in the reply. Use `--share` only when public sharing is authorized. Private publication and public sharing are separate actions.
+
+If publication exits with code 3, report the host or access configuration problem. Stop retries until it is resolved.
