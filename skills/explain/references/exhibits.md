@@ -27,7 +27,7 @@ The runtime lays out and draws the diagram. You write a text spec. You never com
 ```html
 <div class="k-flow"><script type="text/plain">
   dir LR                                  // LR = left to right; TB (default) = top to bottom
-  src = ILGA site / scraped hourly [teal] // id = Label / subtitle [shape, ramp]
+  src = State site / scraped hourly [teal] // id = Label / subtitle [shape, ramp]
   col = Collector / collector.ts [purple]
   db  = Postgres / bills, votes [db, purple]
   q   = Media queue [amber]

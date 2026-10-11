@@ -3,7 +3,7 @@ import { blobKey, isSlug, isToken, newToken, parseMeta, route } from './lib';
 
 describe('isSlug', () => {
   it('takes <group>/<name>', () => {
-    expect(isSlug('legislative-intelligence-engine/engine-overview')).toBe(true);
+    expect(isSlug('billing-service/engine-overview')).toBe(true);
     expect(isSlug('a/b')).toBe(true);
   });
   it('refuses other shapes', () => {
@@ -14,9 +14,9 @@ describe('isSlug', () => {
 describe('parseMeta', () => {
   const page = (stamp: string) => `<html><title>How &amp; why</title><p class="k-stamp">${stamp}</p></html>`;
   it('reads the title, repo and sha from the stamp', () => {
-    expect(parseMeta(page('legislative-intelligence-engine · 0880549 · 2026-10-10 · snapshot'), 'x/y')).toEqual({
+    expect(parseMeta(page('billing-service · 0880549 · 2026-10-10 · snapshot'), 'x/y')).toEqual({
       title: 'How & why',
-      repo: 'legislative-intelligence-engine',
+      repo: 'billing-service',
       sha: '0880549',
     });
   });

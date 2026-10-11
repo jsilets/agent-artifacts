@@ -30,7 +30,7 @@ If you are not sure, ask yourself: "Would a good engineer draw this on a whitebo
 
 Choose the content before the form. A page that shows the wrong points in a good layout is still a bad page.
 
-1. Name the reader and the one question. Example: "Josh wants to know how the engine gets its data and what it can predict." If the user did not say, infer it from the request and the conversation. Ask only if two readings give different pages.
+1. Name the reader and the one question. Example: "The user wants to know how the service gets its data and what it can predict." If the user did not say, infer it from the request and the conversation. Ask only if two readings give different pages.
 2. List every candidate point: from the code, from the conversation, and from any earlier page or doc on the topic.
 3. Give each point one role:
 
