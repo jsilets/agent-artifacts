@@ -27,3 +27,11 @@ This project contains code and design values from these projects.
 
 - Source: https://github.com/docwriter-org/plain-writing-skill (`skills/plain-writing/SKILL.md`, `evals/README.md`)
 - Ideas, not copied text or code: concrete before-and-after examples, paragraph organization, and removal of empty emphasis. The local examples also address visual emphasis. Reader review checks factual fidelity and comprehension in addition to style adherence.
+
+## Deck design sources
+
+None of these projects supplied code or text. The deck support in `kit/explain.js`, `kit/explain.css`, `cli/agent-pages.mjs`, and `skills/explain/references/slides.md` uses these ideas:
+
+- b6+ (https://www.w3.org/Talks/Tools/b6plus/), by Bert Bos at W3C: a page that is a document first and slides second.
+- frontend-slides (https://github.com/zarazhangrui/frontend-slides), MIT: a fixed slide canvas that the page scales.
+- guizang-ppt-skill (https://github.com/op7418/guizang-ppt-skill), AGPL-3.0: a fixed list of named layouts, no long runs of one layout, and overflow measured in pixels with a fix for each size of overflow at 40, 90, and 160 px. This project copies no code or text from it.

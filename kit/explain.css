@@ -235,6 +235,13 @@ button {
   padding: 6px 14px; border-radius: var(--r-md); border: 0.5px solid var(--b2); cursor: pointer;
 }
 button:hover { background: var(--bg2); }
+
+/* Scroll bars float: a thin rounded thumb and no track, on every scrolling element. */
+::-webkit-scrollbar { width: 12px; height: 12px; background: transparent; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background: color-mix(in srgb, var(--p) 24%, transparent) padding-box; }
+::-webkit-scrollbar-thumb:hover { background-color: color-mix(in srgb, var(--p) 40%, transparent); }
+@supports not selector(::-webkit-scrollbar) { * { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--p) 25%, transparent) transparent; } }
 button:disabled { opacity: 0.4; cursor: default; }
 
 /* ─── Steps: a process the reader moves through one stage at a time ─ */
@@ -269,3 +276,169 @@ pre.mermaid { background: transparent; padding: 0; text-align: center; font-fami
   :root:not([data-theme="light"]) :is(.k-card[class*="c-"], .k-layer, .k-stat, .k-callout) { background: color-mix(in srgb, var(--fill, var(--bg2)) 45%, var(--bg2)); }
 }
 :root[data-theme="dark"] :is(.k-card[class*="c-"], .k-layer, .k-stat, .k-callout) { background: color-mix(in srgb, var(--fill, var(--bg2)) 45%, var(--bg2)); }
+
+/* ─── Deck: a 1920×1080 canvas for each slide, scaled and never reflowed ───
+   explain.js wraps each .k-slide in a .k-frame and sets --k-s, the scale for the current view.
+   <html data-k-view> is slide or scroll. <html data-k-rail> shows the thumbnails. */
+:root { --k-s: 0.5; }   /* explain.js sets the real scale on <html> */
+.k-deck { page: deck; }
+@page deck { size: 1920px 1080px; margin: 0; }
+.k-frame { position: relative; width: calc(1920px * var(--k-s)); height: calc(1080px * var(--k-s)); }
+.k-slide {
+  position: absolute; top: 0; left: 0; margin: 0;
+  width: 1920px; height: 1080px; padding: 96px 128px;
+  display: flex; flex-direction: column;
+  transform: scale(var(--k-s)); transform-origin: 0 0;
+  overflow: hidden; background: var(--bg); color: var(--p);
+  font-size: 44px; line-height: 1.4;
+}
+.k-slide.k-natural { height: auto !important; max-height: none !important; }
+.k-slide h1 { font-size: 128px; line-height: 1.05; font-weight: 600; letter-spacing: -0.02em; margin: 0; max-width: 18ch; text-wrap: balance; }
+.k-slide > h2 { font-size: 76px; line-height: 1.12; font-weight: 600; letter-spacing: -0.015em; margin: 0 0 56px; max-width: 26ch; text-wrap: balance; }
+.k-slide h3 { font-size: 52px; line-height: 1.2; font-weight: 600; margin: 0 0 16px; }
+.k-slide p, .k-slide li { font-size: 44px; line-height: 1.4; color: var(--p); max-width: 44ch; margin: 0 0 24px; }
+.k-slide ul, .k-slide ol { margin: 0; padding-left: 1.1em; }
+.k-slide li::marker { color: var(--t); }
+.k-slide .k-stamp { font-size: 28px; margin-top: 40px; }
+.k-slide .k-lede { font-size: 52px; line-height: 1.35; color: var(--s); margin-top: 40px; max-width: 32ch; }
+.k-slide .k-note, .k-slide figcaption { color: var(--s); }
+/* Kit exhibits are sized for a 760 px page. On a slide they draw at 2.5 times that size. */
+.k-slide :is(figure, .k-scroll, .k-table, .k-grid, .k-layers, .k-stats, .k-bars, .k-scale, .k-callout, .k-model, .k-steps, .k-flow, pre, .k-chip):not(:is(figure, .k-scroll, .k-table, .k-grid, .k-layers, .k-stats, .k-bars, .k-scale, .k-callout, .k-model, .k-steps, .k-flow, pre) *) { zoom: 2.5; }
+.k-build { transition: opacity 0.2s; }
+/* The builds on the current slide keep their own layer, so a fade does not move the slide to a new layer and back. */
+:root[data-k-view="slide"] .k-frame.k-cur .k-build { will-change: opacity; }
+.k-build:not(.on) { opacity: 0; }
+
+/* Layouts: data-layout on each slide. */
+.k-slide:is([data-layout="title"], [data-layout="section"], [data-layout="statement"], [data-layout="quote"]) { justify-content: center; }
+.k-slide[data-layout="section"] > h2 { font-size: 104px; max-width: 20ch; margin: 0; }
+.k-slide[data-layout="section"] > p { color: var(--s); margin-top: 32px; }
+.k-slide[data-layout="statement"] > h2 { font-size: 96px; max-width: 24ch; }
+.k-slide[data-layout="statement"] > p { font-size: 48px; color: var(--s); max-width: 40ch; }
+.k-slide[data-layout="split"] { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); column-gap: 96px; align-content: start; }
+.k-slide[data-layout="split"] > h2 { grid-column: 1 / -1; }
+.k-slide[data-layout="split"] > * > :first-child { margin-top: 0; }
+.k-slide[data-layout="figure"] > figure { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; }
+.k-slide[data-layout="figure"] > figure > :is(img, svg) { max-width: 100%; max-height: 100%; object-fit: contain; }
+.k-slide[data-layout="stat"] .k-stat > output { font-size: 48px; }
+.k-slide[data-layout="quote"] > blockquote { font-size: 80px; line-height: 1.3; font-weight: 500; margin: 0; padding-left: 48px; border-left: 6px solid var(--b2); max-width: 28ch; }
+.k-slide[data-layout="quote"] > p { color: var(--s); font-size: 36px; margin-top: 40px; padding-left: 54px; }
+.k-slide[data-layout="code"] > pre { line-height: 1.45; }
+
+/* The deck viewer: a canvas with the slide on it as a sheet, a sidebar of thumbnails, and a floating toolbar. */
+:root { --k-canvas: #e8e6df; --k-sheet: 0 0 0 0.5px rgba(0, 0, 0, 0.14), 0 1px 2px rgba(0, 0, 0, 0.06), 0 6px 20px rgba(0, 0, 0, 0.05); --k-bar: 64px; --k-rail: 0px; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --k-canvas: #222222; --k-sheet: 0 0 0 0.5px rgba(255, 255, 255, 0.14); } }
+:root[data-theme="dark"] { --k-canvas: #222222; --k-sheet: 0 0 0 0.5px rgba(255, 255, 255, 0.14); }
+.k-frame { box-shadow: var(--k-sheet); }
+:root[data-k-view], :root[data-k-view] body { background: var(--k-canvas); }
+
+/* Slide view: one slide centered on the canvas, above the toolbar. */
+:root[data-k-view="slide"] { overflow: hidden; }
+:root[data-k-view="slide"] .k-deck { position: fixed; top: 0; right: 0; bottom: var(--k-bar); left: var(--k-rail); background: var(--k-canvas); }
+:root[data-k-view="slide"] .k-frame { position: absolute; visibility: hidden; left: var(--k-fx, 0); top: var(--k-fy, 0); }
+:root[data-k-view="slide"] .k-frame.k-cur { visibility: visible; }
+
+/* Present: the slide alone on black. The toolbar shows while the pointer moves. */
+:root[data-k-present], :root[data-k-present] :is(body, .k-deck) { background: #000; }
+:root[data-k-present] .k-frame { box-shadow: none; }
+:root[data-k-present]:not(.k-awake) { cursor: none; }
+
+/* Thumbnails: the sidebar of all slides, next to either view. The thumbnails fill its width, so a scroll bar only narrows them. */
+.k-rail { display: none; }
+:root[data-k-rail] .k-rail {
+  display: flex; flex-direction: column; gap: 12px; position: fixed; z-index: 2; top: 0; bottom: 0; left: 0; width: 216px; box-sizing: border-box;
+  padding: 12px 10px 16px 4px; overflow: hidden auto; background: var(--bg); border-right: 0.5px solid var(--b);
+}
+.k-thumb { position: relative; flex: none; display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 6px; align-items: start; padding: 0; border: 0; border-radius: 0; background: none; cursor: pointer; text-align: left; }
+.k-thumb:hover { background: none; }
+.k-tnum { font: 500 11.5px var(--sans); font-variant-numeric: tabular-nums; color: var(--t); text-align: right; padding-top: 1px; }
+.k-tframe { position: relative; display: block; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 3px; box-shadow: 0 0 0 0.5px var(--b2); }
+.k-tframe > .k-slide { transform: scale(var(--k-ts, 0.09)); pointer-events: none; }
+.k-thumb:hover .k-tframe { box-shadow: 0 0 0 1px var(--s); }
+.k-thumb.k-cur .k-tframe, .k-thumb:focus-visible .k-tframe { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--link); }
+.k-thumb:focus-visible { outline: none; }
+.k-thumb.k-cur .k-tnum { color: var(--link); font-weight: 600; }
+
+/* Document: the slides in one column, read top to bottom. */
+:root[data-k-view="scroll"] body { padding-left: var(--k-rail); }
+:root[data-k-view="scroll"] .k-deck { width: calc(1920px * var(--k-s)); margin: 0 auto; padding: 32px 0 calc(var(--k-bar) + 40px); }
+:root[data-k-view="scroll"] .k-frame { margin-bottom: 28px; }
+
+/* The toolbar floats over the canvas, centered under the slide: thumbnails, then the arrows around one tick for each slide. */
+.k-deck-bar { display: none; }
+:root[data-k-view] .k-deck-bar {
+  position: fixed; z-index: 3; bottom: 14px; left: calc(var(--k-rail) + (100% - var(--k-rail)) / 2); translate: -50% 0;
+  display: flex; align-items: center; gap: 2px; height: 40px; padding: 0 4px; box-sizing: border-box;
+  border-radius: 12px; background: var(--bg); box-shadow: 0 0 0 0.5px var(--b2), 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+.k-bt { display: contents; }
+.k-sep { width: 0.5px; height: 18px; margin: 0 4px; background: var(--b2); }
+.k-ib { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px; color: var(--s); background: transparent; }
+.k-ib:hover, .k-ib[aria-pressed="true"] { color: var(--p); background: color-mix(in srgb, var(--p) 8%, transparent); }
+.k-ib:disabled { opacity: 0.3; cursor: default; background: none; }
+.k-ib:focus-visible { outline: 2px solid var(--link); outline-offset: 0; }
+.k-deck-bar [data-tip] { position: relative; }
+.k-deck-bar [data-tip]:hover::after, .k-deck-bar [data-tip]:focus-visible::after {
+  content: attr(data-tip); position: absolute; bottom: calc(100% + 10px); left: 50%; translate: -50% 0; z-index: 4; padding: 4px 7px; border-radius: 6px;
+  background: var(--p); color: var(--bg); font: 500 11.5px/1.2 var(--sans); white-space: pre; pointer-events: none; animation: k-tip 0.12s 0.4s both;
+}
+.k-deck-bar [data-tip-end]:hover::after, .k-deck-bar [data-tip-end]:focus-visible::after { left: auto; right: 0; translate: none; }
+.k-deck-bar .k-bt [data-tip]:hover::after, .k-deck-bar .k-bt [data-tip]:focus-visible::after { left: 0; translate: none; }
+@keyframes k-tip { from { opacity: 0; } }
+.k-ib svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.k-pos { min-width: 40px; padding: 0 8px 0 2px; text-align: right; font: 500 12.5px var(--sans); font-variant-numeric: tabular-nums; color: var(--s); }
+/* Ticks: future slides faint, past slides darker, the current slide in the accent. Title and section slides stand taller. */
+.k-ticks { display: flex; align-items: center; height: 32px; padding: 0 2px; }
+.k-tick { position: relative; width: 10px; height: 28px; padding: 0; border: 0; border-radius: 0; background: none; cursor: pointer; }
+.k-tick:hover { background: none; }
+.k-tick::before { content: ""; position: absolute; left: 2.5px; right: 2.5px; top: 50%; height: 11px; translate: 0 -50%; border-radius: 2px; background: color-mix(in srgb, var(--p) 22%, transparent); }
+.k-tick.k-tall::before { height: 16px; }
+.k-tick.k-past::before { background: color-mix(in srgb, var(--p) 48%, transparent); }
+.k-tick:hover::before { background: color-mix(in srgb, var(--p) 62%, transparent); }
+/* The current tick fills from the bottom as its builds appear. */
+.k-tick.k-cur::before { background: linear-gradient(to top, var(--link) var(--k-f, 100%), color-mix(in srgb, var(--link) 28%, transparent) var(--k-f, 100%)); }
+.k-long { display: flex; align-items: center; width: 160px; height: 24px; padding: 0; margin: 0 6px; cursor: pointer; background: linear-gradient(color-mix(in srgb, var(--p) 16%, transparent), color-mix(in srgb, var(--p) 16%, transparent)) center / 100% 4px no-repeat; }
+.k-fill { display: block; height: 4px; border-radius: 2px; background: var(--link); }
+:root[data-k-present] .k-deck-bar { left: 50%; bottom: 24px; background: rgba(28, 28, 28, 0.9); box-shadow: none; opacity: 0; transition: opacity 0.2s; }
+:root[data-k-present].k-awake .k-deck-bar, :root[data-k-present] .k-deck-bar:focus-within { opacity: 1; }
+:root[data-k-present] .k-deck-bar .k-bt { display: none; }
+:root[data-k-present] :is(.k-ib, .k-pos) { color: #d8d8d8; }
+:root[data-k-present] .k-ib:hover { color: #fff; background: rgba(255, 255, 255, 0.12); }
+:root[data-k-present] .k-tick::before { background: rgba(255, 255, 255, 0.2); }
+:root[data-k-present] .k-tick.k-past::before { background: rgba(255, 255, 255, 0.5); }
+:root[data-k-present] .k-tick.k-cur::before { background: linear-gradient(to top, #fff var(--k-f, 100%), rgba(255, 255, 255, 0.3) var(--k-f, 100%)); }
+/* On a phone, the ticks and the progress line hide, and the position sits between the arrows. */
+@media (max-width: 600px) {
+  .k-ticks { display: none; }
+  .k-deck-bar [data-go="-1"] { order: 1; }
+  .k-deck-bar .k-pos { order: 2; min-width: 48px; padding: 0 2px; text-align: center; }
+  .k-deck-bar [data-go="1"] { order: 3; }
+}
+@media (max-width: 700px) { .k-bt { display: none; } }
+@media (prefers-reduced-motion: reduce) { .k-build, :root[data-k-present] .k-deck-bar { transition: none; } .k-deck-bar [data-tip]::after { animation: none; } }
+
+/* The audit marks a slide that overflows. #…&audit shows the marks; thumbnails never do. */
+:root[data-k-audit="show"] .k-slide[data-k-overflow] { outline: 8px solid #A32D2D; outline-offset: -8px; }
+:root[data-k-audit="show"] .k-slide[data-k-overflow]::after {
+  content: attr(data-k-overflow); position: absolute; top: 16px; right: 16px;
+  font: 500 24px var(--mono); color: #fff; background: #A32D2D; padding: 6px 12px; border-radius: 6px;
+}
+
+/* Without JavaScript, a deck reads as a document at half size. */
+.no-js .k-deck { max-width: 960px; margin: 0 auto; padding: 24px 0; }
+.no-js .k-slide { position: static; transform: none; height: auto; zoom: 0.5; border-bottom: 2px solid var(--b); }
+.no-js .k-build { opacity: 1; }
+
+@media print {
+  html, body { background: none; }
+  :root { --k-s: 1 !important; overflow: visible !important; }
+  .k-deck { position: static !important; display: block !important; width: auto !important; padding: 0 !important; margin: 0 !important; }
+  .k-frame { position: relative !important; visibility: visible !important; translate: none !important; left: auto !important; top: auto !important;
+    width: 1920px !important; height: 1080px !important; padding: 0 !important; margin: 0 !important; box-shadow: none !important; break-after: page; }
+  .k-frame:last-of-type { break-after: auto; }
+  .k-slide { transform: none !important; border-radius: 0 !important; box-shadow: none !important; outline: none !important; content-visibility: visible !important; }
+  .k-slide::after { display: none !important; }
+  .k-build { opacity: 1 !important; }
+  .k-deck-bar, .k-rail { display: none !important; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

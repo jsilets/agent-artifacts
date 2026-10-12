@@ -224,7 +224,10 @@ function fmt(v, f = 'n1', unit = '') {
   return s.replace(/^-/, '−') + (unit ? ' ' + unit : '');
 }
 
-globalThis.Explain = { parseFlow, layoutFlow, evalExpr, evalDefs, fmt, dedent };
+/** The slide layouts the kit draws. A slide names one in data-layout. */
+const DECK_LAYOUTS = ['title', 'section', 'statement', 'bullets', 'split', 'figure', 'table', 'stat', 'quote', 'code'];
+
+globalThis.Explain = { parseFlow, layoutFlow, evalExpr, evalDefs, fmt, dedent, DECK_LAYOUTS };
 if (!HAS_DOM) return;
 
 /* ─── Flow → SVG ─── */
@@ -331,8 +334,300 @@ async function runMermaid() {
   } catch (e) { blocks.forEach((b) => b.insertAdjacentHTML('beforebegin', `<div class="k-err">Mermaid did not load: ${esc(e.message)}</div>`)); }
 }
 
+/* ─── Deck: <main class="k-deck"> with <section class="k-claim k-slide"> slides ───────────
+   The page runs in a sandboxed iframe with no origin, so the deck keeps all state in the hash,
+   talks to the host only with postMessage, and never touches storage.
+   Hash: #<slide id or number>[/<build>][&view=slide|scroll][&thumbs=0|1][&audit] */
+const DECK_W = 1920, DECK_H = 1080, DECK_MIN_FONT = 24, RAIL_W = 216, BAR_H = 64;
+const DECK_ICON = {
+  rail: '<rect x="1.75" y="2.75" width="12.5" height="10.5" rx="2"/><path d="M6 2.75v10.5"/>',
+  prev: '<path d="M9.75 3.5 5.25 8l4.5 4.5"/>',
+  next: '<path d="M6.25 3.5 10.75 8l-4.5 4.5"/>',
+};
+const deckIcon = (k) => `<svg viewBox="0 0 16 16" aria-hidden="true">${DECK_ICON[k]}</svg>`;
+function runDeck(deck) {
+  const root = document.documentElement;
+  const slides = [...deck.querySelectorAll(':scope > .k-slide')];
+  const N = slides.length; if (!N) return;
+  const frames = slides.map((s, i) => {
+    if (!s.id) s.id = 'slide-' + (i + 1);
+    const f = document.createElement('div'); f.className = 'k-frame'; f.dataset.n = i + 1;
+    s.before(f); f.append(s);
+    s.querySelectorAll('.k-build').forEach((b, k) => { b.dataset.k = k + 1; });
+    return f;
+  });
+  const builds = (i) => slides[i].querySelectorAll('.k-build').length;
+  // thumbs is null until the reader chooses; then the sidebar follows the screen width.
+  const S = { i: 0, b: 0, view: 'slide', thumbs: null, present: false };
+  const bar = document.createElement('nav'); bar.className = 'k-deck-bar'; bar.setAttribute('aria-label', 'Deck');
+  // A floating toolbar: thumbnails | previous, one tick for each slide, next, position. Each control has a tooltip.
+  // The ticks show the deck's structure: section slides stand taller, and a slide with builds fills its tick in steps.
+  // A long deck gets one continuous bar instead, because its ticks would not fit.
+  const TICKS_MAX = 15, heading = (s) => (s.querySelector('h1, h2, blockquote')?.textContent || '').replace(/\s+/g, ' ').trim();
+  const tipOf = (i) => { const t = heading(slides[i]); return `${i + 1}  ${t.length > 56 ? t.slice(0, 55) + '…' : t}`.trim(); };
+  const ticks = N <= TICKS_MAX
+    ? `<span class="k-ticks">${slides.map((s, i) => `<button type="button" class="k-tick${['title', 'section'].includes(s.dataset.layout) ? ' k-tall' : ''}" data-i="${i}" tabindex="-1" aria-label="Slide ${i + 1}" data-tip="${esc(tipOf(i))}"></button>`).join('')}</span>`
+    : '<span class="k-ticks k-long" aria-hidden="true"><span class="k-fill"></span></span>';
+  bar.innerHTML = `<span class="k-bt"><button type="button" class="k-ib" data-thumbs aria-label="Thumbnails">${deckIcon('rail')}</button><span class="k-sep"></span></span>`
+    + `<button type="button" class="k-ib" data-go="-1" aria-label="Previous slide" data-tip="Previous slide  ←">${deckIcon('prev')}</button>${ticks}<button type="button" class="k-ib" data-go="1" aria-label="Next slide" data-tip="Next slide  →">${deckIcon('next')}</button>`
+    + '<span class="k-pos" aria-live="polite"></span>';
+  // The sidebar holds copies of the slides.
+  const rail = document.createElement('nav'); rail.className = 'k-rail'; rail.setAttribute('aria-label', 'Slides');
+  deck.before(rail); deck.append(bar);
+
+  const parseHash = () => {
+    let t = '', kv = [];
+    try { [t, ...kv] = decodeURIComponent(location.hash.slice(1)).split('&'); } catch {}
+    const p = Object.fromEntries(kv.map((x) => x.split('=')));
+    const [id, b] = t.split('/');
+    let i = /^\d+$/.test(id) ? +id - 1 : slides.findIndex((s) => s.id === id || (id && s.querySelector('#' + CSS.escape(id))));
+    return { i: clamp(i < 0 ? 0 : i, 0, N - 1), b: +b || 0, view: ['slide', 'scroll'].includes(p.view) ? p.view : undefined, thumbs: 'thumbs' in p ? p.thumbs !== '0' : null, audit: 'audit' in p };
+  };
+  const hashOf = () => '#' + slides[S.i].id + (S.b ? '/' + S.b : '') + (S.view !== 'slide' ? '&view=' + S.view : '') + (S.thumbs === null ? '' : '&thumbs=' + +S.thumbs) + (root.dataset.kAudit ? '&audit' : '');
+  let hashTimer;
+  const writeHash = () => {
+    clearTimeout(hashTimer);
+    hashTimer = setTimeout(() => {
+      const h = hashOf(); if (h === location.hash) return;
+      // replaceState, not location.hash: the host's Back button must not step through slides.
+      try { history.replaceState(null, '', h); } catch {}
+      if (parent !== window) parent.postMessage({ ns: 'k-deck', v: 1, type: 'location', hash: h }, '*');
+    }, 300);
+  };
+
+  // Copy the slides into the sidebar each time it opens, so the copies show flows and charts drawn since.
+  function fillRail() {
+    rail.replaceChildren(...slides.map((s, i) => {
+      const c = s.cloneNode(true);
+      c.removeAttribute('id'); c.removeAttribute('hidden'); c.classList.remove('k-claim');
+      // A copy keeps its SVG ids under a new name, so arrows and styles in the slide still point at the slide's own markers.
+      c.querySelectorAll('[id]').forEach((e) => {
+        if (!e.closest('svg')) return e.removeAttribute('id');
+        const id = e.id, nid = `${id}-t${i}`, ref = new RegExp(`#${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-])`, 'g');
+        e.id = nid;
+        c.querySelectorAll('*').forEach((x) => [...x.attributes].forEach((a) => { if (a.value.includes('#' + id)) a.value = a.value.replace(ref, '#' + nid); }));
+        c.querySelectorAll('style').forEach((st) => { if (st.textContent.includes('#' + id)) st.textContent = st.textContent.replace(ref, '#' + nid); });
+      });
+      c.querySelectorAll('.k-build').forEach((e) => e.classList.add('on'));
+      c.inert = true; c.setAttribute('aria-hidden', 'true');
+      const t = document.createElement('button'); t.type = 'button'; t.className = 'k-thumb'; t.dataset.i = i;
+      t.setAttribute('aria-label', `Slide ${i + 1}`);
+      t.innerHTML = `<span class="k-tnum">${i + 1}</span><span class="k-tframe"></span>`;
+      t.title = (s.querySelector('h1, h2, blockquote')?.textContent || `Slide ${i + 1}`).replace(/\s+/g, ' ').trim();
+      t.lastChild.append(c);
+      return t;
+    }));
+    rail.dataset.filled = '';
+  }
+  // Like Google Slides, the sidebar shows on a wide screen until the reader hides it.
+  const railWanted = () => S.thumbs ?? root.clientWidth >= 1000;
+  const railOn = () => railWanted() && !S.present && root.clientWidth >= 700;
+  // The position text and the ticks: past slides darker, the current one in the accent, filled by its builds.
+  function markBar() {
+    bar.querySelector('.k-pos').textContent = `${S.i + 1} / ${N}`;
+    const fill = builds(S.i) && S.view === 'slide' ? ((S.b + 1) / (builds(S.i) + 1)) * 100 : 100;
+    bar.querySelectorAll('.k-tick').forEach((t, i) => {
+      t.classList.toggle('k-past', i < S.i); t.classList.toggle('k-cur', i === S.i);
+      if (i === S.i) { t.style.setProperty('--k-f', fill + '%'); t.setAttribute('aria-current', 'true'); } else t.removeAttribute('aria-current');
+    });
+    const long = bar.querySelector('.k-long .k-fill'); if (long) long.style.width = ((S.i + 1) / N) * 100 + '%';
+  }
+  function markRail() {
+    if (!railOn()) return;
+    [...rail.children].forEach((t, i) => { t.classList.toggle('k-cur', i === S.i); if (i === S.i) t.setAttribute('aria-current', 'true'); else t.removeAttribute('aria-current'); });
+    rail.children[S.i]?.scrollIntoView({ block: 'nearest' });
+  }
+
+  function layout() {
+    const rl = railOn(), vw = root.clientWidth - (rl ? RAIL_W : 0), v = S.view;
+    const bh = S.present ? 0 : BAR_H, vh = root.clientHeight - bh, pad = S.present ? 0 : vw < 700 ? 12 : 32;
+    if (rl) root.dataset.kRail = ''; else delete root.dataset.kRail;
+    if (S.present) root.dataset.kPresent = ''; else delete root.dataset.kPresent;
+    root.style.setProperty('--k-bar', bh + 'px');
+    root.style.setProperty('--k-rail', (rl ? RAIL_W : 0) + 'px');
+    // The slide width is a multiple of 16 px, so the width and the height are whole pixels. The slide sits on whole pixels too.
+    // A slide on a half pixel shifts its edges when a build fades in.
+    const fit = v === 'slide' ? Math.min((vw - 2 * pad) / DECK_W, (vh - 2 * pad) / DECK_H) : Math.min(vw - 48, 1100) / DECK_W;
+    const s = Math.max(16, Math.floor((fit * DECK_W) / 16) * 16) / DECK_W;
+    const was = root.style.getPropertyValue('--k-s');
+    root.style.setProperty('--k-s', s);
+    root.style.setProperty('--k-fx', Math.floor((vw - s * DECK_W) / 2) + 'px');
+    root.style.setProperty('--k-fy', Math.floor((vh - s * DECK_H) / 2) + 'px');
+    // The thumbnails fill the sidebar, so their scale follows its width, with or without a scroll bar.
+    const tf = rl && rail.querySelector('.k-tframe');
+    if (tf && tf.clientWidth) root.style.setProperty('--k-ts', tf.clientWidth / DECK_W);
+    // Chrome keeps SVG text placed for the old scale until the SVG lays out again.
+    if (was && +was !== s) deck.querySelectorAll('.k-slide svg').forEach((g) => { g.style.display = 'none'; g.getBoundingClientRect(); g.style.display = ''; });
+  }
+  function show() {
+    root.dataset.kView = S.view;
+    frames.forEach((f, i) => f.classList.toggle('k-cur', i === S.i));
+    slides.forEach((s, i) => {
+      // In the slide view, the browser's find-in-page still finds text on hidden slides.
+      if (S.view === 'slide' && i !== S.i) s.setAttribute('hidden', 'until-found'); else s.removeAttribute('hidden');
+      s.querySelectorAll('.k-build').forEach((b) => b.classList.toggle('on', i !== S.i || S.view === 'scroll' || +b.dataset.k <= S.b));
+    });
+    markBar();
+    const tb = bar.querySelector('[data-thumbs]');
+    tb.setAttribute('aria-pressed', railWanted()); tb.dataset.tip = (railWanted() ? 'Hide' : 'Show') + ' thumbnails  T';
+    bar.querySelector('[data-go="-1"]').disabled = S.i === 0 && S.b === 0;
+    bar.querySelector('[data-go="1"]').disabled = S.i === N - 1 && S.b === builds(N - 1);
+    layout();
+    if (railOn() && !('filled' in rail.dataset)) { fillRail(); layout(); }
+    markRail();
+    writeHash();
+  }
+  function go(i, b = 0, opts = {}) {
+    S.i = clamp(i, 0, N - 1); S.b = clamp(b, 0, builds(S.i)); show();
+    if (S.view === 'scroll' && opts.scroll !== false) frames[S.i].scrollIntoView({ block: 'start' });
+  }
+  const step = (d) => {
+    if (d > 0) { if (S.b < builds(S.i)) go(S.i, S.b + 1); else if (S.i < N - 1) go(S.i + 1, 0); }
+    else if (S.b > 0) go(S.i, S.b - 1); else if (S.i > 0) go(S.i - 1, builds(S.i - 1));
+  };
+  // Until the reader picks a view, the view follows the width: slides when wide, the document on a phone.
+  let autoView = false;
+  const widthView = () => (root.clientWidth < 600 ? 'scroll' : 'slide');
+  function setView(v, auto = false) {
+    autoView = auto; S.view = v; show();
+    if (v === 'scroll') frames[S.i].scrollIntoView({ block: 'start' }); else scrollTo(0, 0);
+  }
+  function toggleThumbs() { S.thumbs = !railWanted(); if (S.thumbs) fillRail(); show(); }
+  // Present: the current slide, full screen. The sidebar and the bar stay hidden until the pointer moves.
+  function present() {
+    if (S.view !== 'slide') setView('slide');
+    if (document.fullscreenEnabled) (document.fullscreenElement ? document.exitFullscreen() : root.requestFullscreen()).catch(() => {});
+  }
+  addEventListener('fullscreenchange', () => { S.present = !!document.fullscreenElement; show(); });
+  addEventListener('message', (e) => {
+    const d = e.data; if (!d || d.ns !== 'k-deck' || d.v !== 1 || parent === window || e.source !== parent) return;
+    // The host makes the frame full screen itself, so it tells the deck when that starts and ends.
+    if (d.type === 'present') { S.present = !!d.on; if (S.present && S.view !== 'slide') { S.view = 'slide'; autoView = false; } show(); }
+    if (d.type === 'view' && ['slide', 'scroll'].includes(d.view)) setView(d.view);
+    if (d.type === 'audit') parent.postMessage({ ns: 'k-deck', v: 1, type: 'audit', report: window.kDeck?.report || null }, '*');
+  });
+
+  // ─── Input ───
+  addEventListener('keydown', (e) => {
+    if (e.target.closest?.('input, textarea, select, [contenteditable]') || e.metaKey || e.ctrlKey || e.altKey) return;
+    const k = e.key, paged = S.view === 'slide';
+    if (paged && ['ArrowRight', 'ArrowDown', 'PageDown', ' '].includes(k)) step(1);
+    else if (paged && ['ArrowLeft', 'ArrowUp', 'PageUp'].includes(k)) step(-1);
+    else if (paged && k === 'Home') go(0);
+    else if (paged && k === 'End') go(N - 1, builds(N - 1));
+    else if (k === 't' || k === 'T') toggleThumbs();
+    else if (k === 'd' || k === 'D') setView(S.view === 'scroll' ? 'slide' : 'scroll');
+    else if (k === 'f' || k === 'F') present();
+    else return;
+    e.preventDefault();
+  });
+  bar.addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.go) step(+b.dataset.go);
+    if ('thumbs' in b.dataset) toggleThumbs();
+    if (b.classList.contains('k-tick')) go(+b.dataset.i);
+  });
+  bar.querySelector('.k-long')?.addEventListener('click', (e) => { const r = e.currentTarget.getBoundingClientRect(); go(Math.floor(((e.clientX - r.left) / r.width) * N)); });
+  // In the slide view, the wheel or a trackpad swipe pages through the slides, as in Preview's single-page view.
+  // One gesture moves one slide: after a step, the deck waits for the gesture's momentum to stop.
+  let wheelSum = 0, wheelLock = false, wheelIdle;
+  addEventListener('wheel', (e) => {
+    if (S.view !== 'slide' || e.ctrlKey || e.target.closest?.('.k-rail, .k-deck-bar')) return;
+    e.preventDefault();
+    clearTimeout(wheelIdle); wheelIdle = setTimeout(() => { wheelLock = false; wheelSum = 0; }, 220);
+    if (wheelLock) return;
+    wheelSum += Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+    if (Math.abs(wheelSum) >= 50) { step(wheelSum > 0 ? 1 : -1); wheelLock = true; wheelSum = 0; }
+  }, { passive: false });
+  rail.addEventListener('click', (e) => { const t = e.target.closest('.k-thumb'); if (t) go(+t.dataset.i); });
+  slides.forEach((s, i) => s.addEventListener('beforematch', () => go(i)));
+  let tx = null;
+  deck.addEventListener('touchstart', (e) => { tx = e.touches[0].clientX; }, { passive: true });
+  deck.addEventListener('touchend', (e) => { if (tx === null || S.view !== 'slide') return; const dx = e.changedTouches[0].clientX - tx; tx = null; if (Math.abs(dx) > 50) step(dx < 0 ? 1 : -1); });
+  let idle;
+  addEventListener('pointermove', () => { root.classList.add('k-awake'); clearTimeout(idle); idle = setTimeout(() => root.classList.remove('k-awake'), 2000); });
+  addEventListener('hashchange', () => { const h = parseHash(); if (h.view && h.view !== S.view) { S.view = h.view; autoView = false; } S.thumbs = h.thumbs; go(h.i, h.b); });
+  new ResizeObserver(() => requestAnimationFrame(() => {
+    if (autoView && widthView() !== S.view) return setView(widthView(), true);
+    const rl = 'kRail' in root.dataset; layout(); if (rl !== railOn()) show();
+  })).observe(root);
+  new ResizeObserver(() => requestAnimationFrame(layout)).observe(rail);
+  // In the document view, the current slide is the last one whose top is above a line near the top of the screen, or the last slide at the end of the page.
+  let scrollTick = 0;
+  addEventListener('scroll', () => { if (S.view !== 'scroll' || scrollTick) return; scrollTick = requestAnimationFrame(() => {
+    scrollTick = 0; const line = Math.min(innerHeight * 0.3, 120);
+    let i = 0; frames.forEach((f, k) => { if (f.getBoundingClientRect().top <= line) i = k; });
+    if (innerHeight + scrollY >= root.scrollHeight - 2) i = N - 1;
+    if (i !== S.i) { S.i = i; S.b = 0; markBar(); markRail(); writeHash(); }
+  }); }, { passive: true });
+
+  const h = parseHash();
+  S.view = h.view || widthView(); autoView = !h.view;
+  // The host's thumbnail render: the slide alone, as in Present.
+  if ('kCapture' in root.dataset) { S.view = 'slide'; S.present = true; autoView = false; }
+  S.thumbs = h.thumbs;
+  if (h.audit) root.dataset.kAudit = 'show';
+  go(h.i, h.b, { scroll: false });
+  if (S.view === 'scroll' && (h.i || location.hash)) frames[S.i].scrollIntoView({ block: 'start' });
+  // Flows and charts draw after this function returns. Copy the slides again once they have.
+  if (railOn()) setTimeout(() => { fillRail(); show(); });
+  auditDeck(slides);
+}
+
+/* ─── Deck audit: how far each slide overflows its 1920×1080 canvas ───
+   Reports on each slide (data-k-overflow), on <html> (data-k-audit, then data-k-deck="ready"),
+   in a JSON script block with the id k-deck-report, in the console, and to the host viewer. */
+async function auditDeck(slides) {
+  try { await document.fonts.ready; } catch {}
+  await Promise.all([...document.images].map((im) => (im.decode ? im.decode().catch(() => {}) : null)));
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  const root = document.documentElement;
+  // until-found skips the layout of hidden slides, so show them all while measuring.
+  const hidden = slides.filter((s) => s.hasAttribute('hidden'));
+  hidden.forEach((s) => s.removeAttribute('hidden'));
+  const path = (el, s) => {
+    const parts = [];
+    for (let x = el; x && x !== s; x = x.parentElement) parts.unshift(x.tagName.toLowerCase() + (x.classList[0] ? '.' + x.classList[0] : ''));
+    return '#' + s.id + ' > ' + parts.join(' > ') + ' "' + el.textContent.trim().replace(/\s+/g, ' ').slice(0, 40) + '"';
+  };
+  const results = slides.map((s, i) => {
+    const r = { id: s.id, n: i + 1, layout: s.dataset.layout || '', y: 0, x: 0, clip: [], tiny: [] };
+    const innerH = s.clientHeight, innerW = s.clientWidth;
+    r.y = s.scrollHeight - innerH; r.x = s.scrollWidth - innerW;
+    // A flex child can shrink and clip without raising scrollHeight. Measure again at natural height.
+    s.classList.add('k-natural');
+    r.y = Math.max(r.y, s.scrollHeight - innerH);
+    s.classList.remove('k-natural');
+    s.querySelectorAll('*').forEach((el) => {
+      if (el.closest('[data-k-crop], svg')) return;
+      const c = getComputedStyle(el);
+      const hides = /hidden|clip|auto|scroll/.test(c.overflowX + c.overflowY) || c.textOverflow === 'ellipsis' || (c.webkitLineClamp && c.webkitLineClamp !== 'none');
+      if (hides && (el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1)) r.clip.push(path(el, s));
+      const own = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
+      if (own && parseFloat(c.fontSize) * (el.currentCSSZoom || 1) < DECK_MIN_FONT - 0.5) r.tiny.push(path(el, s));
+    });
+    r.y = Math.max(0, Math.round(r.y)); r.x = Math.max(0, Math.round(r.x));
+    r.fail = r.y > 1 || r.x > 1 || r.clip.length > 0;
+    if (r.fail || r.tiny.length) s.dataset.kOverflow = `y:${r.y} x:${r.x} clip:${r.clip.length} tiny:${r.tiny.length}`; else delete s.dataset.kOverflow;
+    return r;
+  });
+  hidden.forEach((s) => s.setAttribute('hidden', 'until-found'));
+  const fails = results.filter((r) => r.fail);
+  const report = { v: 1, w: DECK_W, h: DECK_H, minFont: DECK_MIN_FONT, pass: !fails.length, slides: results };
+  let tag = document.getElementById('k-deck-report');
+  if (!tag) { tag = document.createElement('script'); tag.type = 'application/json'; tag.id = 'k-deck-report'; document.body.append(tag); }
+  tag.textContent = JSON.stringify(report);
+  window.kDeck = { report };
+  fails.forEach((r) => console.warn('[k-deck:overflow] ' + JSON.stringify(r)));
+  console.info(`[k-deck:audit] ${fails.length ? 'fail ' + fails.length : 'pass'} (${results.length} slides)`);
+  root.dataset.kAuditResult = fails.length ? 'fail:' + fails.length : 'pass';
+  if (parent !== window) parent.postMessage({ ns: 'k-deck', v: 1, type: 'audit', report }, '*');
+  root.dataset.kDeck = 'ready';
+}
+
 function init() {
   document.documentElement.classList.remove('no-js');
+  document.querySelectorAll('main.k-deck').forEach(runDeck);
   document.querySelectorAll('.k-flow').forEach((el) => { try { drawFlow(el); } catch (e) { el.innerHTML = `<div class="k-err">${esc(e.message)}</div>`; } });
   document.querySelectorAll('.k-dots[data-score]').forEach(drawDots);
   document.querySelectorAll('.k-model').forEach(runModel);

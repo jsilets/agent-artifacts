@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // agent-pages: make, check, pack and publish explain pages. Node 18+, no dependencies.
 //
-//   agent-pages new <slug> [--title "Title"] [--dir <out dir>]   write a page skeleton, print its path
+//   agent-pages new <slug> [--title "Title"] [--dir <out dir>] [--deck]  write a page or deck skeleton, print its path
 //   agent-pages check <page.html>                                 lint; exit 1 on errors
 //   agent-pages pack <page.html> [-o out.html] [--inline]          lint, then inline the kit into one file
 //   agent-pages serve <page.html> [--port 8765]                    serve the page's folder on 127.0.0.1, print the URL
@@ -35,7 +35,7 @@ const git = (args, cwd) => { try { return execFileSync('git', args, { cwd, stdio
 function read(p) { if (!p || !existsSync(p)) { console.error(`no such file: ${p}`); process.exit(2); } return readFileSync(p, 'utf8'); }
 
 function cmdNew() {
-  const title = flag('--title'), dir = flag('--dir');
+  const title = flag('--title'), dir = flag('--dir'), deck = has('--deck');
   const slug = (rest[0] || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   if (!slug) { console.error('give a slug: agent-pages new engine-overview'); process.exit(2); }
   const top = git(['rev-parse', '--show-toplevel'], process.cwd());
@@ -47,7 +47,7 @@ function cmdNew() {
   mkdirSync(dirname(out), { recursive: true });
   if (existsSync(out)) { console.error(`exists, not overwritten: ${out}`); process.exit(1); }
   const t = title || slug.replace(/-/g, ' ').replace(/^./, (c) => c.toUpperCase());
-  const html = readFileSync(join(KIT, 'template.html'), 'utf8')
+  const html = readFileSync(join(KIT, deck ? 'deck-template.html' : 'template.html'), 'utf8')
     .replace('href="explain.css"', `href="${join(KIT, 'explain.css')}"`).replace('src="explain.js"', `src="${join(KIT, 'explain.js')}"`)
     .replaceAll('{{TITLE}}', t).replaceAll('{{REPO}}', repo).replaceAll('{{SHA}}', sha).replaceAll('{{BRANCH}}', branch).replaceAll('{{DATE}}', date)
     .replaceAll('{{DAY}}', new Date(date + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }));
@@ -132,9 +132,12 @@ async function cmdPublish() {
   if (!/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?\/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/.test(slug)) out(2, { error: 'bad slug', slug }, `error: the slug "${slug}" must be group/name in lowercase letters, digits and hyphens`);
 
   const page = await call('PUT', `/api/pages/${slug}`, html, 'text/html; charset=utf-8');
-  const result = { slug: page.slug, version: page.version, url: page.url, versionUrl: page.versionUrl };
+  const result = { slug: page.slug, version: page.version, kind: page.kind, url: page.url, versionUrl: page.versionUrl, ...(page.audit ? { audit: page.audit } : {}) };
   if (share) result.shareUrl = (await call('POST', `/api/pages/${slug}/shares`, JSON.stringify({ version: 'latest' }), 'application/json')).url;
-  out(0, result, [`${page.url}  (v${page.version})`, result.shareUrl && `share: ${result.shareUrl}`].filter(Boolean).join('\n'));
+  // A deck comes back with the kit's overflow audit, measured in a browser on the 1920×1080 canvas.
+  const a = page.audit;
+  const auditText = !a ? null : a.error ? `audit: not run (${a.error})` : a.pass && !a.problems.length ? 'audit: every slide fits' : ['audit: fix these slides, then publish again', ...a.problems.map((p) => '  ' + p)].join('\n');
+  out(0, result, [`${page.url}  (v${page.version})`, result.shareUrl && `share: ${result.shareUrl}`, auditText].filter(Boolean).join('\n'));
 }
 
 /** Lists the pages, newest first, or the best match on each page for --search. */
@@ -158,9 +161,12 @@ const strip = (s) => s.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<sty
 const sentences = (t) => t.split(/(?<=[.!?])\s+(?=[A-Z0-9"“])/).map((s) => s.trim()).filter((s) => /\w/.test(s));
 const nwords = (s) => s.split(/\s+/).filter((w) => /\w/.test(w)).length;
 
+const isDeck = (html) => /<main\b[^>]*class\s*=\s*["'][^"']*\bk-deck\b/i.test(html);
+
 function lint(html, file) {
   const errs = [], warns = [];
   const err = (m) => errs.push(m), warn = (m) => warns.push(m);
+  if (isDeck(html)) { lintDeck(html, err, warn); lintShared(html, err, warn); return { errs, warns }; }
 
   // Kit structure. Source checkout metadata is optional for non-code documents.
   if (!/class="k-stamp"/.test(html)) err('missing the .k-stamp line under the h1');
@@ -185,6 +191,12 @@ function lint(html, file) {
     if (w > 16) warn(`${no}: the h2 has ${w} words. Consider shortening it without losing its meaning`);
   });
 
+  lintShared(html, err, warn);
+  return { errs, warns };
+}
+
+/** Rules for words, look, flows and models. Pages and decks share them. */
+function lintShared(html, err, warn) {
   // Words
   const body = html.replace(/<!--[\s\S]*?-->/g, '').replace(/<head[\s\S]*?<\/head>/i, '');
   const authored = body.replace(/<(blockquote|q)\b[^>]*>[\s\S]*?<\/\1>/gi, ' ');
@@ -227,8 +239,53 @@ function lint(html, file) {
       [...block.matchAll(/data-(?:out|bar)="([^"]+)"/g)].forEach((x) => { try { const v = E.evalExpr(x[1], all); if (!Number.isFinite(v)) warn(`model ${i + 1}: "${x[1]}" is not a finite number at the default inputs`); } catch (e) { err(`model ${i + 1}: ${e.message}`); } });
     } catch (e) { err(`model ${i + 1}: ${e.message}`); }
   });
+}
 
-  return { errs, warns };
+// ─── Deck lint ──────────────────────────────────────────────────────
+// The kit's audit measures overflow in a browser at publish. These rules need no browser.
+const DECK_BUDGET = { bullets: 6, tableRows: 8, codeLines: 16, words: 80 };
+const META_TEXT = /\b(?:better|improved|revised|updated|new|final|more targeted)\b[^.<]{0,30}\bversion\b|\((?:revised|updated|new)\)|\bv\d+(?:\.\d+)?\s*(?:of this|deck|slide)/i;
+
+function lintDeck(html, err, warn) {
+  if (!/<h1[^>]*>[\s\S]*?<\/h1>/i.test(html)) err('missing the h1 title on the title slide');
+  if (!/class="k-stamp"/.test(html)) err('missing the .k-stamp line on the title slide');
+  const lede = html.match(/<p class="k-lede">([\s\S]*?)<\/p>/);
+  if (!lede) err('missing the .k-lede on the title slide: the answer or purpose of the deck');
+  else if (/^The answer or purpose of the deck\.?$/.test(strip(lede[1]))) err('the .k-lede still holds the template text');
+
+  const slides = [...html.matchAll(/<section\b([^>]*\bclass\s*=\s*"[^"]*\bk-slide\b[^"]*"[^>]*)>([\s\S]*?)<\/section>/g)].map((m) => ({ attrs: m[1], body: m[2] }));
+  if (!slides.length) { err('the deck has no <section class="k-claim k-slide">'); return; }
+  const ids = new Set(), layouts = [];
+  slides.forEach((sl, i) => {
+    const no = `slide ${i + 1}`;
+    const id = (sl.attrs.match(/\bid="([^"]+)"/) || [])[1];
+    const layout = (sl.attrs.match(/\bdata-layout="([^"]+)"/) || [])[1];
+    const visible = sl.body;
+    if (!/\bk-claim\b/.test(sl.attrs)) err(`${no}: add the class k-claim, so the host can index and link the slide`);
+    if (!id) warn(`${no}: no id. A stable id keeps links to the slide working when slides move`);
+    else if (ids.has(id)) err(`${no}: the id "${id}" is used twice`); else ids.add(id);
+    if (!layout || !E.DECK_LAYOUTS.includes(layout)) err(`${no}: data-layout must be one of ${E.DECK_LAYOUTS.join(', ')}`);
+    layouts.push(layout);
+    // A run of the same layout: bullets and figures may repeat 3 times, the others 2 times.
+    const run = layouts.length - 1 - layouts.findLastIndex((l) => l !== layout), limit = ['bullets', 'figure'].includes(layout) ? 4 : 3;
+    if (layout && run === limit) warn(`${no}: the ${layout} layout repeats ${limit} times in a row. Vary the layouts`);
+    const h2 = visible.match(/<h2[^>]*>([\s\S]*?)<\/h2>/);
+    if (!h2 && !['title', 'quote'].includes(layout)) err(`${no}: no h2. Give the slide a takeaway heading`);
+    if (h2 && nwords(strip(h2[1])) > 14) warn(`${no}: the h2 has ${nwords(strip(h2[1]))} words. A slide heading reads best at 14 words or fewer`);
+    const t = strip(visible);
+    if (/A takeaway heading for this slide|Replace this point with the content/.test(strip(sl.body))) err(`${no}: the slide still holds template text`);
+    const words = nwords(t.replace(strip(h2 ? h2[1] : ''), ''));
+    if (words > DECK_BUDGET.words) warn(`${no}: ${words} words on the slide. Keep a slide under ${DECK_BUDGET.words}; split it or show the point as a figure`);
+    const lis = (visible.match(/<li[\s>]/g) || []).length;
+    if (lis > DECK_BUDGET.bullets) warn(`${no}: ${lis} bullets. Keep a slide to ${DECK_BUDGET.bullets} or fewer`);
+    const rows = (visible.match(/<tr[\s>]/g) || []).length;
+    if (rows > DECK_BUDGET.tableRows) warn(`${no}: the table has ${rows} rows. Keep a slide table to ${DECK_BUDGET.tableRows} or fewer`);
+    [...visible.matchAll(/<pre[^>]*>([\s\S]*?)<\/pre>/g)].forEach((m) => { const n = m[1].trim().split('\n').length; if (n > DECK_BUDGET.codeLines) warn(`${no}: a code block has ${n} lines. Keep slide code to ${DECK_BUDGET.codeLines} or fewer`); });
+    if (META_TEXT.test(t)) warn(`${no}: the slide text mentions a version or revision ("${t.match(META_TEXT)[0]}"). Remove revision history from slides`);
+  });
+  const css = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map((m) => m[1]).join('\n').replace(/\/\* explain\.css[\s\S]*$/, '') + ' ' + [...html.matchAll(/style="([^"]*)"/g)].map((m) => m[1]).join(';');
+  if (/overflow\s*:\s*(?:hidden|clip)|line-clamp|text-overflow\s*:\s*ellipsis/.test(css)) warn('custom CSS hides overflow (overflow:hidden, line-clamp or ellipsis). Hidden text escapes the audit; mark an intended crop with data-k-crop');
+  if (/\d(?:vw|vh|dvh|svh|vmin|vmax)\b/.test(css)) warn('custom CSS uses viewport units. Slides have a fixed 1920×1080 canvas; use px');
 }
 
 function report({ errs, warns }) {
@@ -256,4 +313,4 @@ else if (cmd === 'pack') cmdPack();
 else if (cmd === 'serve') cmdServe();
 else if (cmd === 'publish') cmdPublish();
 else if (cmd === 'list') cmdList();
-else { console.error('usage: agent-pages new <slug> [--title T] [--dir D] | check <page> | pack <page> [-o out] [--inline] | serve <page> [--port N] | publish <page> [--slug S] [--share] [--json] | list [--search Q] [--json]'); process.exit(2); }
+else { console.error('usage: agent-pages new <slug> [--title T] [--dir D] [--deck] | check <page> | pack <page> [-o out] [--inline] | serve <page> [--port N] | publish <page> [--slug S] [--share] [--json] | list [--search Q] [--json]'); process.exit(2); }

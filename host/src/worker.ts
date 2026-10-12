@@ -5,8 +5,8 @@ import faviconSvg from '../../brand/mark-small.svg?raw';
 import faviconIco from '../../brand/favicon.ico?inline';
 import touchIcon from '../../brand/apple-touch-icon.png?inline';
 import { verifyAccessJwt, type Identity } from './auth';
-import { blobKey, claimId, type IconName, ftsQuery, newToken, pageChunks, parseMeta, parseTheme, route, thumbKey, withKit, withTheme, type Theme } from './lib';
-import { libraryHtml, messageHtml, sharedHtml, viewerHtml, type PageRow, type VersionRow } from './views';
+import { auditFromHtml, auditLines, blobKey, claimId, type DeckAudit, type IconName, ftsQuery, newToken, pageChunks, pageKind, type PageKind, parseMeta, parseTheme, pdfKey, route, thumbKey, withKit, withTheme, type Theme } from './lib';
+import { KIT, libraryHtml, messageHtml, sharedHtml, viewerHtml, type PageRow, type VersionRow } from './views';
 
 interface Env {
   DB: D1Database;
@@ -98,7 +98,7 @@ async function identify(req: Request, env: Env): Promise<Identity | null> {
   return verifyAccessJwt(req.headers.get('cf-access-jwt-assertion'), { team: env.ACCESS_TEAM, aud: env.ACCESS_AUD });
 }
 
-const PAGE_COLUMNS = 'slug, title, repo, latest, updated_at, pinned_at, thumb, (SELECT COUNT(*) FROM shares WHERE shares.slug = pages.slug) AS shared';
+const PAGE_COLUMNS = 'slug, title, repo, kind, latest, updated_at, pinned_at, thumb, (SELECT COUNT(*) FROM shares WHERE shares.slug = pages.slug) AS shared';
 
 async function getPage(env: Env, slug: string) {
   return env.DB.prepare(`SELECT ${PAGE_COLUMNS} FROM pages WHERE slug = ?`).bind(slug).first<PageRow>();
@@ -120,12 +120,15 @@ async function indexPage(env: Env, slug: string, title: string, html: string) {
   ]);
 }
 
-/** Takes a light and a dark screenshot of the top of the page and stores them in R2. */
+/** Takes a light and a dark screenshot of the top of the page, or of a deck's first slide, and stores them in R2. */
 async function makeThumbs(env: Env, slug: string, version: number, html: string) {
+  const deck = pageKind(html) === 'deck';
   for (const theme of ['light', 'dark'] as const) {
     const res = await env.BROWSER.quickAction('screenshot', {
-      html: withTheme(withKit(html, kitCss), theme),
-      viewport: { width: 960, height: 600 },
+      // data-k-capture makes the kit show the first slide alone, with no toolbar or sidebar.
+      html: withTheme(withKit(deck ? html.replace(/<html\b/i, '<html data-k-capture') : html, kitCss), theme),
+      viewport: deck ? { width: 960, height: 540 } : { width: 960, height: 600 },
+      ...(deck ? { waitForSelector: { selector: 'html[data-k-deck="ready"]', timeout: 20000 } } : {}),
       // The kit fades each block in. Stop that, so the shot shows the finished page.
       addStyleTag: [{ content: "*, *::before, *::after { animation: none !important; transition: none !important; }" }],
       gotoOptions: { waitUntil: 'networkidle0', timeout: 20000 },
@@ -138,6 +141,53 @@ async function makeThumbs(env: Env, slug: string, version: number, html: string)
   await env.DB.prepare('UPDATE pages SET thumb = ? WHERE slug = ? AND COALESCE(thumb, 0) < ?').bind(version, slug, version).run();
 }
 
+/** Every deck runs the kit's audit when it loads. Browser Rendering opens the deck and reads the report. */
+async function auditDeck(env: Env, html: string): Promise<DeckAudit | { error: string }> {
+  try {
+    const res = await env.BROWSER.quickAction('content', {
+      html: withTheme(withKit(html, kitCss), 'light'),
+      viewport: { width: 1920, height: 1080 },
+      waitForSelector: { selector: 'html[data-k-deck="ready"]', timeout: 20000 },
+      gotoOptions: { waitUntil: 'networkidle0', timeout: 20000 },
+      cacheTTL: 0,
+    });
+    if (!res.ok) return { error: `the audit render failed (${res.status})` };
+    const body = (await res.json()) as { result?: string };
+    return auditFromHtml(body.result || '') ?? { error: 'the deck wrote no audit report' };
+  } catch (e) {
+    return { error: `the audit did not run: ${String((e as Error).message || e).slice(0, 160)}` };
+  }
+}
+
+/** A deck's PDF: one 1920×1080 page for each slide. R2 keeps it for each version and kit. */
+async function deckPdf(env: Env, slug: string, version: number, filename: string) {
+  const key = pdfKey(slug, version, KIT);
+  let pdf: ArrayBuffer | null = null;
+  const cached = await env.PAGES.get(key);
+  if (cached) pdf = await cached.arrayBuffer();
+  else {
+    const obj = await env.PAGES.get(blobKey(slug, version));
+    if (!obj) return fail(404, 'no such version');
+    const res = await env.BROWSER.quickAction('pdf', {
+      html: withTheme(withKit(await obj.text(), kitCss), 'light'),
+      viewport: { width: 1920, height: 1080 },
+      emulateMediaType: 'print',
+      waitForSelector: { selector: 'html[data-k-deck="ready"]', timeout: 20000 },
+      gotoOptions: { waitUntil: 'networkidle0', timeout: 20000 },
+      pdfOptions: { preferCSSPageSize: true, printBackground: true },
+      cacheTTL: 0,
+    });
+    if (!res.ok) return fail(502, `the PDF render failed (${res.status})`);
+    pdf = await res.arrayBuffer();
+    await env.PAGES.put(key, pdf, { httpMetadata: { contentType: 'application/pdf' } });
+  }
+  return new Response(pdf, {
+    headers: { ...BASE_HEADERS, 'content-type': 'application/pdf', 'content-disposition': `inline; filename="${filename}.pdf"`, 'cache-control': 'private, max-age=300' },
+  });
+}
+
+const pdfName = (title: string, version: number) => (title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'deck') + '-v' + version;
+
 /** Builds the search rows and the thumbnails for the latest version again. */
 async function refresh(env: Env, slug: string) {
   const p = await getPage(env, slug);
@@ -145,6 +195,7 @@ async function refresh(env: Env, slug: string) {
   const obj = await env.PAGES.get(blobKey(slug, p.latest));
   if (!obj) return fail(404, 'no such version');
   const html = await obj.text();
+  await env.DB.prepare('UPDATE pages SET kind = ? WHERE slug = ?').bind(pageKind(html), slug).run();
   await indexPage(env, slug, p.title, html);
   await makeThumbs(env, slug, p.latest, html);
   return json({ slug, version: p.latest, indexed: true, thumb: true });
@@ -178,6 +229,7 @@ async function publish(req: Request, env: Env, ctx: ExecutionContext, slug: stri
   if (bytes > MAX_BYTES) return fail(413, 'the page is over 5 MB');
   if (!/<html[\s>]/i.test(html)) return fail(400, 'the body is not an HTML document');
   const meta = parseMeta(html, slug);
+  const kind: PageKind = pageKind(html);
   const at = now();
   // One statement picks the next number, so two publishes of one slug never share a version.
   await env.DB.prepare('INSERT INTO pages (slug, title, repo, latest, created_at, updated_at) VALUES (?, ?, ?, 0, ?, ?) ON CONFLICT (slug) DO NOTHING')
@@ -195,13 +247,16 @@ async function publish(req: Request, env: Env, ctx: ExecutionContext, slug: stri
     await env.DB.prepare('DELETE FROM versions WHERE slug = ? AND version = ?').bind(slug, version).run();
     throw e;
   }
-  await env.DB.prepare('UPDATE pages SET latest = MAX(latest, ?), title = ?, repo = ?, updated_at = ? WHERE slug = ?')
-    .bind(version, meta.title, meta.repo, at, slug)
+  await env.DB.prepare('UPDATE pages SET latest = MAX(latest, ?), title = ?, repo = ?, kind = ?, updated_at = ? WHERE slug = ?')
+    .bind(version, meta.title, meta.repo, kind, at, slug)
     .run();
   await indexPage(env, slug, meta.title, html);
   // A thumbnail takes a few seconds. The library shows a placeholder until it exists.
   ctx.waitUntil(makeThumbs(env, slug, version, html).catch((e) => console.error('thumbnail', slug, version, e)));
-  return json({ slug, version, title: meta.title, url: `${origin}/p/${slug}`, versionUrl: `${origin}/p/${slug}/v/${version}` }, 201);
+  // A deck waits for its audit, so the agent that published it sees the slides that overflow.
+  const audit = kind === 'deck' ? await auditDeck(env, html) : undefined;
+  const auditOut = audit && ('error' in audit ? audit : { pass: audit.pass, problems: auditLines(audit) });
+  return json({ slug, version, kind, title: meta.title, url: `${origin}/p/${slug}`, versionUrl: `${origin}/p/${slug}/v/${version}`, ...(auditOut ? { audit: auditOut } : {}) }, 201);
 }
 
 async function deletePage(env: Env, slug: string) {
@@ -268,11 +323,12 @@ async function handle(req: Request, env: Env, ctx: ExecutionContext): Promise<Re
   }
 
   // Share links: Access lets /s/* through with no login, so the token is the only check.
-  if (r.kind === 'share-view' || r.kind === 'share-raw') {
+  if (r.kind === 'share-view' || r.kind === 'share-raw' || r.kind === 'share-pdf') {
     if (method !== 'GET') return fail(405, 'method not allowed');
     const hit = await resolveShare(env, r.token);
     if (!hit) return page(messageHtml('Link not found', 'This share link does not exist or was revoked.', nonce, '/s/_/explain.css'), nonce, 404);
-    if (r.kind === 'share-view') return page(sharedHtml({ token: r.token, title: hit.page.title, repo: hit.page.repo, version: hit.version }, nonce), nonce);
+    if (r.kind === 'share-view') return page(sharedHtml({ token: r.token, title: hit.page.title, repo: hit.page.repo, kind: hit.page.kind, version: hit.version }, nonce), nonce);
+    if (r.kind === 'share-pdf') return hit.page.kind === 'deck' ? deckPdf(env, hit.page.slug, hit.version.version, pdfName(hit.page.title, hit.version.version)) : fail(404, 'only decks have a PDF');
     const obj = await env.PAGES.get(blobKey(hit.page.slug, hit.version.version));
     return obj ? rawPage(obj, false, theme) : fail(404, 'no such version');
   }
@@ -298,11 +354,17 @@ async function handle(req: Request, env: Env, ctx: ExecutionContext): Promise<Re
       const { results: versions } = await env.DB.prepare('SELECT version, sha, created_at FROM versions WHERE slug = ? ORDER BY version DESC').bind(r.slug).all<VersionRow>();
       const version = versions.find((v) => v.version === (r.version ?? p.latest));
       if (!version) return page(messageHtml('Version not found', `${r.slug} has no version ${r.version}.`, nonce), nonce, 404);
-      return page(viewerHtml({ slug: p.slug, title: p.title, repo: p.repo, version, versions, latest: p.latest, followsLatest: r.version === null }, nonce), nonce);
+      return page(viewerHtml({ slug: p.slug, title: p.title, repo: p.repo, kind: p.kind, version, versions, latest: p.latest, followsLatest: r.version === null }, nonce), nonce);
     }
     case 'raw': {
       const obj = await env.PAGES.get(blobKey(r.slug, r.version));
       return obj ? rawPage(obj, true, theme) : fail(404, 'no such version');
+    }
+    case 'pdf': {
+      const p = await getPage(env, r.slug);
+      if (!p || p.kind !== 'deck') return fail(404, 'only decks have a PDF');
+      if (!(await getVersion(env, r.slug, r.version))) return fail(404, 'no such version');
+      return deckPdf(env, r.slug, r.version, pdfName(p.title, r.version));
     }
     case 'api-list':
       if (method !== 'GET') return fail(405, 'method not allowed');

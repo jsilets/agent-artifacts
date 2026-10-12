@@ -13,7 +13,7 @@ Infer the audience, prior knowledge, and purpose from the request. Ask only when
 
 - **Teaching.** Explain necessary terms and the mechanism. Use a concrete example when it helps. An extended lesson can include a practice question with an answer the reader can check.
 - **Documents.** Include the context, evidence, decisions, and required actions an independent reader needs. Preserve an existing outline unless restructuring is requested or necessary.
-- **Presentations.** For a live talk, keep each slide focused and put supporting detail in notes. A deck read alone needs enough explanation without a presenter. Follow the requested template.
+- **Presentations.** Keep each slide to one point, and give it enough explanation to make sense without a presenter. Decks have no speaker notes. Follow the requested template. Make a deck with `agent-pages new --deck` and read [references/slides.md](references/slides.md) first.
 
 A shared page must make sense without this chat. Keep essential context in the page and production details out of it.
 
