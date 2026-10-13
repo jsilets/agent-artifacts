@@ -2,14 +2,16 @@
 // A page runs only inside the sandboxed iframe, from the /raw or /s/<token>/raw route.
 
 import kitCss from '../../kit/explain.css?raw';
+import kitJs from '../../kit/explain.js?raw';
 
 /**
  * A short hash of the kit. Pages and thumbnails are cached for a year, and the host builds both
  * with the current kit, so their URLs carry this hash. A new kit gives new URLs.
  */
-const KIT = (() => {
+export const KIT = (() => {
   let h = 0x811c9dc5;
-  for (let i = 0; i < kitCss.length; i++) h = Math.imul(h ^ kitCss.charCodeAt(i), 0x01000193);
+  const kit = kitCss + kitJs;
+  for (let i = 0; i < kit.length; i++) h = Math.imul(h ^ kit.charCodeAt(i), 0x01000193);
   return (h >>> 0).toString(36);
 })();
 
@@ -38,6 +40,8 @@ const ICON: Record<string, string> = {
   download: '<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/>',
   trash: '<path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l.9 12.1a1.5 1.5 0 0 0 1.5 1.4h6.2a1.5 1.5 0 0 0 1.5-1.4L17.5 7"/>',
   x: '<path d="m7 7 10 10M17 7 7 17"/>',
+  play: '<path d="M8 5.5v13l10.5-6.5z"/>',
+  share: '<path d="M12 3.5v11M8 7.5l4-4 4 4"/><path d="M8.5 11H7a1.5 1.5 0 0 0-1.5 1.5v6A1.5 1.5 0 0 0 7 20h10a1.5 1.5 0 0 0 1.5-1.5v-6A1.5 1.5 0 0 0 17 11h-1.5"/>',
   search: '<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/>',
   list: '<path d="M9 6.5h11M9 12h11M9 17.5h11"/><circle cx="4.8" cy="6.5" r="0.9" fill="currentColor"/><circle cx="4.8" cy="12" r="0.9" fill="currentColor"/><circle cx="4.8" cy="17.5" r="0.9" fill="currentColor"/>',
   pin: '<path d="M9 3.5h6l-.9 6.2 3.4 3.3V15h-11v-2l3.4-3.3z"/><path d="M12 15v5.5"/>',
@@ -71,7 +75,7 @@ svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width:
 /* The version pill: the one place the version shows. Amber when the reader is not on the latest. */
 .v-ver { flex: none; display: inline-flex; align-items: center; gap: 2px; height: 30px; margin-right: 6px; padding: 0 3px; border: 0.5px solid var(--b2); border-radius: 999px; font: 500 12px var(--mono); color: var(--s); }
 .v-ver.is-old { background: var(--fill); border-color: var(--line); color: var(--ink); }
-.v-step { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 999px; color: inherit; }
+.v-step { position: relative; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 999px; color: inherit; }
 .v-step:hover { background: var(--bg2); text-decoration: none; }
 .v-ver.is-old .v-step:hover { background: color-mix(in srgb, var(--line) 18%, transparent); }
 .v-step[aria-disabled="true"] { opacity: 0.3; pointer-events: none; }
@@ -89,6 +93,11 @@ svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width:
 
 .v-share { flex: none; height: 30px; margin-left: 6px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--p); color: var(--bg); font: 600 13px var(--sans); cursor: pointer; }
 .v-share:hover { background: var(--press); }
+.v-share svg { display: none; width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.v-present { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 30px; margin-left: 6px; padding: 0 12px 0 10px; border: 0.5px solid var(--b2); border-radius: 999px; background: transparent; color: var(--p); font: 600 13px var(--sans); cursor: pointer; }
+.v-present:hover { background: var(--bg2); }
+.v-present svg { width: 14px; height: 14px; fill: currentColor; stroke: none; }
+.h-kind { font: 500 11px var(--mono); color: var(--s); border: 0.5px solid var(--b2); border-radius: 4px; padding: 0 5px; line-height: 16px; }
 
 /* Tooltips: shown after a short pause, never while a menu is open. */
 [data-tip]:hover::after, [data-tip]:focus-visible::after { content: attr(data-tip); position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%); z-index: 40; padding: 4px 7px; border-radius: 6px; background: var(--p); color: var(--bg); font: 500 11.5px/1.2 var(--sans); white-space: nowrap; pointer-events: none; animation: v-tip 0.12s 0.4s both; }
@@ -146,7 +155,11 @@ svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width:
 .v-toast[hidden] { display: none; }
 
 @media (max-width: 640px) {
-  .v-repo, .v-slash, .v-step { display: none; }
+  .v-repo, .v-slash, .v-step, #copy, .v-lbl { display: none; }
+  /* On a phone, Present and Share show only their icons. */
+  .v-present, .v-share { width: 32px; height: 32px; padding: 0; justify-content: center; }
+  .v-share { display: inline-flex; align-items: center; }
+  .v-share svg { display: block; }
   .v-sharepop { width: calc(100vw - 16px); }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -154,7 +167,10 @@ svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width:
 }
 
 /* ─── Library ───────────────────────────────────────────── */
-.h-bar { --bar: 44px; position: sticky; top: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 520px) minmax(0, 1fr); gap: 12px; padding: 0 8px 0 16px; }
+/* Only the area under the header scrolls, so the scroll bar starts below the header and the header keeps its full width. */
+body:has(> .h-bar) { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+.h-scroll { flex: 1; min-height: 0; overflow: auto; }
+.h-bar { --bar: 44px; flex: none; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 520px) minmax(0, 1fr); gap: 12px; padding: 0 8px 0 16px; }
 .h-brand { display: flex; align-items: center; gap: 6px; font: 600 13.5px/20px var(--sans); letter-spacing: -0.005em; }
 /* The mark without its tile: drawn in the text colour, so it inverts with the theme. The tile is for tabs and home screens. */
 .h-mark { width: 14px; height: 13px; fill: currentColor; stroke: none; }
@@ -283,6 +299,8 @@ export interface PageRow {
   thumb: number | null;
   /** The number of active share links. */
   shared: number;
+  /** 'deck' for a slide deck, 'page' otherwise. */
+  kind: string;
 }
 
 /**
@@ -317,7 +335,7 @@ export function libraryHtml(pages: PageRow[], nonce: string) {
     </dl>
   </div>
 </header>
-<main class="h-main" id="main"></main>
+<div class="h-scroll"><main class="h-main" id="main"></main></div>
 <div class="v-pop" id="pop-card" data-anchor hidden>
   <button type="button" class="v-item" data-act="pin">${icon('pin')}<span>Pin</span></button>
   <button type="button" class="v-item" data-act="copy">${icon('link')}Copy link</button>
@@ -351,12 +369,13 @@ const thumb = (p, sheets) => '<span class="h-thumb"' + (sheets ? ' data-sheets="
   ? ['light', 'dark'].map((t) => '<img class="h-img h-' + t + '" src="/t/' + p.slug + '/' + p.thumb + '/' + t + '.webp?k=' + D.kit + '" alt="" loading="lazy" decoding="async">').join('')
   : '<span class="h-ph">&lt;/&gt;</span>') + '</span>';
 const access = (p) => '<span class="h-acc" title="' + (p.shared ? 'Shared by link' : 'Only you') + '">' + svg(p.shared ? 'globe' : 'lock') + '</span>';
-const menu = (p) => '<button type="button" class="v-icon h-menu" aria-label="More for ' + h(p.title) + '" aria-expanded="false">' + svg('more') + '</button>';
+const menu = (p) => '<button type="button" class="v-icon h-menu" aria-label="More for ' + h(p.title) + '" data-tip="More" data-tip-end aria-expanded="false">' + svg('more') + '</button>';
+const kind = (p) => p.kind === 'deck' ? '<span class="h-kind">Deck</span>' : '';
 const card = (p) => '<article class="h-card" data-slug="' + p.slug + '"><a class="h-link" href="/p/' + p.slug + '">'
   + thumb(p, Math.min(2, p.latest - 1)) + '<span class="h-title">' + h(p.title) + '</span>'
-  + '<span class="h-sub">' + access(p) + '<span>Published ' + ago(p.updated_at) + '</span><span class="h-v">v' + p.latest + '</span></span></a>' + menu(p) + '</article>';
+  + '<span class="h-sub">' + access(p) + kind(p) + '<span>Published ' + ago(p.updated_at) + '</span><span class="h-v">v' + p.latest + '</span></span></a>' + menu(p) + '</article>';
 const row = (p) => '<article class="h-row" data-slug="' + p.slug + '"><a class="h-link" href="/p/' + p.slug + '">'
-  + thumb(p, 0) + '<span class="h-title">' + h(p.title) + '</span><span class="h-repo">' + h(repoOf(p)) + '</span>'
+  + thumb(p, 0) + '<span class="h-title">' + h(p.title) + ' ' + kind(p) + '</span><span class="h-repo">' + h(repoOf(p)) + '</span>'
   + '<span class="h-when">Published ' + ago(p.updated_at) + '</span><span class="h-v">v' + p.latest + '</span>' + access(p) + '</a>' + menu(p) + '</article>';
 const mark = (s) => h(s).replace(/\\u0002/g, '<mark>').replace(/\\u0003/g, '</mark>');
 const unmark = (s) => s.replace(/[\\u0002\\u0003]/g, '');
@@ -493,6 +512,7 @@ export interface ViewerInput {
   slug: string;
   title: string;
   repo: string | null;
+  kind: string;
   version: VersionRow;
   versions: VersionRow[];
   latest: number;
@@ -501,6 +521,17 @@ export interface ViewerInput {
 }
 
 const SANDBOX = 'allow-scripts allow-popups allow-popups-to-escape-sandbox';
+
+/** A deck asks for full screen itself (the F key), so its frame allows it. */
+const frameAttrs = (kind: string) => `sandbox="${SANDBOX}"${kind === 'deck' ? ' allow="fullscreen"' : ''}`;
+
+/** The Present button and the ⋯ menu items for a deck. */
+const presentButton = (kind: string) => (kind === 'deck' ? `<button type="button" class="v-present" id="present" aria-label="Present">${icon('play')}<span class="v-lbl">Present</span></button>` : '');
+const deckItems = (kind: string, pdf: string) =>
+  kind === 'deck'
+    ? `<a class="v-item" href="${pdf}" target="_blank" rel="noopener">${icon('download')}Download PDF</a>
+    <div class="v-hr"></div>`
+    : '';
 
 /** The Appearance control and the ⋯ menu items that both viewers share. */
 function appearance() {
@@ -558,7 +589,8 @@ $$('.v-pop').forEach((pop) => {
 document.addEventListener('click', () => closePop());
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePop(true); });
 window.addEventListener('blur', () => closePop());
-window.addEventListener('scroll', () => { if (open && open.pop.hasAttribute('data-anchor')) closePop(); }, { passive: true });
+// Capture scrolls on any element: the library scrolls inside .h-scroll, not the window.
+document.addEventListener('scroll', () => { if (open && open.pop.hasAttribute('data-anchor')) closePop(); }, { passive: true, capture: true });
 
 const toastEl = $('#toast');
 let toastTimer;
@@ -590,6 +622,21 @@ function applyTheme() {
   const src = frame.dataset.src + (theme === 'auto' ? '' : '&theme=' + theme) + location.hash;
   if (frame.getAttribute('src') !== src) frame.src = src;
 }
+
+// A deck keeps its slide in the hash. It reports each change, so a reload or a copied link opens the same slide.
+const toDeck = (msg) => frame && frame.contentWindow.postMessage({ ns: 'k-deck', v: 1, ...msg }, '*');
+addEventListener('message', (e) => {
+  if (!frame || e.source !== frame.contentWindow) return;
+  const d = e.data;
+  if (d && d.ns === 'k-deck' && d.type === 'location' && typeof d.hash === 'string' && /^#[\\w\\-./&=]{0,200}$/.test(d.hash)) history.replaceState(history.state, '', location.pathname + d.hash);
+});
+$('#present')?.addEventListener('click', async () => {
+  try { await frame.requestFullscreen(); } catch {}
+  toDeck({ type: 'view', view: 'slide' });
+  frame.focus();
+});
+// The deck hides its sidebar and controls while the frame is full screen.
+document.addEventListener('fullscreenchange', () => toDeck({ type: 'present', on: !!frame && document.fullscreenElement === frame }));
 $$('[data-theme-set]').forEach((b) => b.addEventListener('click', () => {
   theme = b.dataset.themeSet;
   try { if (theme === 'auto') localStorage.removeItem('theme'); else localStorage.setItem('theme', theme); } catch {}
@@ -605,7 +652,7 @@ export function viewerHtml(input: ViewerInput, nonce: string) {
   const href = (v: number) => (v === latest ? `/p/${esc(slug)}` : `/p/${esc(slug)}/v/${v}`);
   const step = (dir: 'left' | 'right', v: number, label: string) => {
     const ok = versions.some((x) => x.version === v);
-    return `<a class="v-step" ${ok ? `href="${href(v)}"` : 'aria-disabled="true"'} aria-label="${label}">${icon(dir)}</a>`;
+    return `<a class="v-step" ${ok ? `href="${href(v)}"` : 'aria-disabled="true"'} aria-label="${label}" data-tip="${label}">${icon(dir)}</a>`;
   };
   const versionItems = versions
     .map(
@@ -626,7 +673,8 @@ export function viewerHtml(input: ViewerInput, nonce: string) {
   </div>
   <button type="button" class="v-icon" id="copy" data-tip="Copy link" aria-label="Copy link">${icon('link')}</button>
   <button type="button" class="v-icon" data-pop="pop-more" data-tip="More" aria-label="More">${icon('more')}</button>
-  <button type="button" class="v-share" data-pop="pop-share">Share</button>
+  ${presentButton(input.kind)}
+  <button type="button" class="v-share" data-pop="pop-share" aria-label="Share">${icon('share')}<span class="v-lbl">Share</span></button>
 
   <div class="v-pop" id="pop-ver" hidden>
     ${old ? `<a class="v-item c-amber v-latest" href="/p/${esc(slug)}">${icon('right')}<span>Go to the latest version</span><span class="v-meta">v${latest}</span></a><div class="v-hr"></div>` : ''}
@@ -636,6 +684,7 @@ export function viewerHtml(input: ViewerInput, nonce: string) {
   <div class="v-pop" id="pop-more" hidden>
     ${appearance()}
     <div class="v-hr"></div>
+    ${deckItems(input.kind, `/pdf/${esc(slug)}/${n}`)}
     <a class="v-item" href="/raw/${esc(slug)}/${n}?k=${KIT}" target="_blank" rel="noopener">${icon('open')}Open in new tab</a>
     <a class="v-item" href="/raw/${esc(slug)}/${n}?k=${KIT}" download="${esc(slug.replace('/', '-'))}-v${n}.html">${icon('download')}Download HTML</a>
     <div class="v-hr"></div>
@@ -652,7 +701,7 @@ export function viewerHtml(input: ViewerInput, nonce: string) {
     <ul class="v-links" id="links"></ul>
   </div>
 </header>
-<iframe class="v-frame" title="${esc(title)}" sandbox="${SANDBOX}" data-src="/raw/${esc(slug)}/${n}?k=${KIT}"></iframe>
+<iframe class="v-frame" title="${esc(title)}" ${frameAttrs(input.kind)} data-src="/raw/${esc(slug)}/${n}?k=${KIT}"></iframe>
 </div>
 <div class="v-toast" id="toast" role="status" hidden></div>
 <script type="application/json" id="data">${data({ slug, version: n, followsLatest: input.followsLatest, icons: { link: ICON.link, check: ICON.check, x: ICON.x } })}</script>`;
@@ -722,20 +771,22 @@ $('#create').addEventListener('click', async (e) => {
   return shell(title, nonce, body, script);
 }
 
-export function sharedHtml(input: { token: string; title: string; repo: string | null; version: VersionRow }, nonce: string) {
+export function sharedHtml(input: { token: string; title: string; repo: string | null; kind: string; version: VersionRow }, nonce: string) {
   const raw = `/s/${esc(input.token)}/raw?k=${KIT}`;
   const body = `<div class="v">
 <header class="v-bar">
   <div class="v-crumb"><span class="v-title">${esc(input.title)}</span></div>
   <button type="button" class="v-icon" data-pop="pop-more" data-tip="More" data-tip-end aria-label="More">${icon('more')}</button>
+  ${presentButton(input.kind)}
   <div class="v-pop" id="pop-more" hidden>
     ${appearance()}
     <div class="v-hr"></div>
+    ${deckItems(input.kind, `/s/${esc(input.token)}/pdf`)}
     <a class="v-item" href="${raw}" target="_blank" rel="noopener">${icon('open')}Open in new tab</a>
     <a class="v-item" href="${raw}" download="${esc(input.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'page')}.html">${icon('download')}Download HTML</a>
   </div>
 </header>
-<iframe class="v-frame" title="${esc(input.title)}" sandbox="${SANDBOX}" data-src="${raw}"></iframe>
+<iframe class="v-frame" title="${esc(input.title)}" ${frameAttrs(input.kind)} data-src="${raw}"></iframe>
 </div>
 <div class="v-toast" id="toast" role="status" hidden></div>`;
   return shell(input.title, nonce, body, COMMON_SCRIPT, '/s/_/explain.css');

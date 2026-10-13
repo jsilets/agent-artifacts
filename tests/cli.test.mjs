@@ -85,3 +85,51 @@ test('packing still rejects pages above the size limit', (t) => {
   assert.equal(result.status, 1, result.stderr);
   assert.match(result.stderr, /512 KB/);
 });
+
+// The kit runtime: the flow parser, the layout, and the palette map for diagram templates.
+const kit = fileURLToPath(new URL('../kit/explain.js', import.meta.url));
+await import(kit);
+const E = globalThis.Explain;
+
+test('flows read tags, zones and a legend', () => {
+  const m = E.parseFlow('dir LR\nlegend\na = Edge / worker.ts [teal, tag:edge]\nb = Store [db, tag:kv]\nzone "Real time": a b\ngroup "Deploy": b\na => b : reads');
+  assert.deepEqual(m.errors, []);
+  assert.equal(m.legend, true);
+  assert.equal(m.nodes.a.tag, 'EDGE');
+  assert.deepEqual(m.groups.map((g) => [g.label, g.zone]), [['Real time', true], ['Deploy', false]]);
+  assert.match(E.parseFlow('a = A [tag:waytoolongforatag]').errors[0], /tag:name/);
+});
+
+test('a group label moves to a corner that no arrow crosses', () => {
+  // The arrow from d enters i from the top, through the top-left corner of the zone around i.
+  const m = E.parseFlow('dir LR\n| d | . |\n| . | . |\n| i | o |\nd = Detect\ni = Investigate\no = Outcome\nd --> i : unclear\ni -> o\nzone "Look-back · days to months": i');
+  const L = E.layoutFlow(m), g = L.groups[0];
+  const crossed = (x0, y0, x1, y1) => L.routes.flatMap((r) => r.segs).some(([ax, ay, bx, by]) => Math.max(ax, bx) >= x0 && Math.min(ax, bx) <= x1 && Math.max(ay, by) >= y0 && Math.min(ay, by) <= y1);
+  const x0 = g.anchor === 'start' ? g.lx - 3 : g.lx - g.lw, x1 = g.anchor === 'start' ? g.lx + g.lw : g.lx + 3;
+  assert.equal(g.clash, false);
+  assert.equal(crossed(x0, g.ly, x1, g.ly + g.lh), false);
+});
+
+test('the diagram palette maps any alpha and leaves other colors alone', () => {
+  assert.equal(E.diagramColor('#2d3142'), 'var(--d-ink)');
+  assert.equal(E.diagramColor('rgba(191,69,32,.08)'), 'color-mix(in srgb, var(--d-accent) 8%, transparent)');
+  assert.equal(E.diagramColor('white'), 'var(--d-node)');
+  assert.equal(E.diagramColor('#7c8f6f'), null);
+  assert.equal(E.diagramColor('none'), null);
+});
+
+test('a diagram template fails check until its caption is replaced', (t) => {
+  const tpl = readFileSync(fileURLToPath(new URL('../skills/explain/diagrams/sequence.html', import.meta.url)), 'utf8');
+  const raw = check(t, page(section(tpl)));
+  assert.equal(raw.status, 1, raw.stderr);
+  assert.match(raw.stderr, /diagram 1: the figcaption still holds the template text/);
+  const done = check(t, page(section(tpl.replace(/<figcaption>[^<]*<\/figcaption>/, '<figcaption>The edge asks the origin once.</figcaption>'))));
+  assert.equal(done.status, 0, done.stderr);
+  assert.doesNotMatch(done.stderr, /own <style>|inline style/);
+});
+
+test('flows warn when only some nodes have a tag', (t) => {
+  const result = check(t, page(section('<div class="k-flow"><script type="text/plain">a = A [tag:api]\nb = B\na -> b : calls</script></div>')));
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stderr, /1 of 2 nodes have a tag/);
+});

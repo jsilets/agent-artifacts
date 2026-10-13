@@ -69,8 +69,10 @@ export type Route =
   | { kind: 'api-refresh'; slug: string }
   | { kind: 'api-search' }
   | { kind: 'thumb'; slug: string; version: number; theme: Theme }
+  | { kind: 'pdf'; slug: string; version: number }
   | { kind: 'share-view'; token: string }
   | { kind: 'share-raw'; token: string }
+  | { kind: 'share-pdf'; token: string }
   | { kind: 'not-found' };
 
 const NUM = /^[1-9][0-9]{0,8}$/;
@@ -92,6 +94,7 @@ export function route(path: string): Route {
   if (p[0] === 'p' && ok && p.length === 3) return { kind: 'view', slug, version: null };
   if (p[0] === 'p' && ok && p.length === 5 && p[3] === 'v' && NUM.test(p[4])) return { kind: 'view', slug, version: +p[4] };
   if (p[0] === 'raw' && ok && p.length === 4 && NUM.test(p[3])) return { kind: 'raw', slug, version: +p[3] };
+  if (p[0] === 'pdf' && ok && p.length === 4 && NUM.test(p[3])) return { kind: 'pdf', slug, version: +p[3] };
   if (p[0] === 't' && ok && p.length === 5 && NUM.test(p[3]) && (p[4] === 'light.webp' || p[4] === 'dark.webp')) return { kind: 'thumb', slug, version: +p[3], theme: p[4] === 'light.webp' ? 'light' : 'dark' };
   if (path === '/api/search') return { kind: 'api-search' };
   if (p[0] === 'api' && p[1] === 'pages') {
@@ -105,12 +108,16 @@ export function route(path: string): Route {
   if (p[0] === 'api' && p[1] === 'shares' && p.length === 3 && isToken(p[2])) return { kind: 'api-share', token: p[2] };
   if (p[0] === 's' && p.length === 2 && isToken(p[1])) return { kind: 'share-view', token: p[1] };
   if (p[0] === 's' && p.length === 3 && isToken(p[1]) && p[2] === 'raw') return { kind: 'share-raw', token: p[1] };
+  if (p[0] === 's' && p.length === 3 && isToken(p[1]) && p[2] === 'pdf') return { kind: 'share-pdf', token: p[1] };
   return { kind: 'not-found' };
 }
 
 /** The R2 key of one stored version. */
 export const blobKey = (slug: string, version: number) => `pages/${slug}/${version}.html`;
 
+
+/** The R2 key of a deck's PDF. The kit hash is in the key, because a new kit draws the slides again. */
+export const pdfKey = (slug: string, version: number, kit: string) => `pages/${slug}/${version}.${kit}.pdf`;
 
 /** The R2 key of one thumbnail. It sits under the page's prefix, so deleting the page deletes it. */
 export const thumbKey = (slug: string, version: number, theme: Theme) => `pages/${slug}/${version}.${theme}.webp`;
@@ -123,13 +130,19 @@ export function withTheme(html: string, theme: Theme): string {
 }
 
 /**
- * A packed page carries the kit CSS from the day it was published. This swaps in the current kit,
- * so old pages and their thumbnails show the current look. A page without the packed kit is unchanged.
+ * A packed page carries the kit CSS and JS from the day it was published. This swaps in the current kit,
+ * so old pages and their thumbnails show the current look and drawing. A page without the packed kit is unchanged.
+ * The JS swap is optional, so a caller can pass the CSS alone.
  */
-export function withKit(html: string, css: string): string {
+export function withKit(html: string, css: string, js?: string): string {
   const start = html.indexOf('<style>\n/* explain.css');
   const end = start < 0 ? -1 : html.indexOf('</style>', start);
-  return end < 0 ? html : html.slice(0, start) + '<style>\n' + css + '\n' + html.slice(end);
+  if (end >= 0) html = html.slice(0, start) + '<style>\n' + css + '\n' + html.slice(end);
+  if (js == null) return html;
+  // cli/agent-pages.mjs packs the JS as <script>\n/* explain.js…</script>, with each "</script" escaped inside it.
+  const js0 = html.indexOf('<script>\n/* explain.js');
+  const js1 = js0 < 0 ? -1 : html.indexOf('</script>', js0);
+  return js1 < 0 ? html : html.slice(0, js0) + '<script>\n' + js.replace(/<\/script/gi, '<\\/script') + '\n' + html.slice(js1);
 }
 
 // ─── Search ─────────────────────────────────────────────────────────
@@ -190,4 +203,66 @@ export function pageChunks(html: string): Chunk[] {
     chunks.push({ anchor: id, heading, body: rest.slice(0, 20000) });
   });
   return chunks;
+}
+
+// ─── Decks ──────────────────────────────────────────────────────────
+
+export type PageKind = 'page' | 'deck';
+
+/** A deck is a page whose HTML has <main class="k-deck">. */
+export function pageKind(html: string): PageKind {
+  return /<main\b[^>]*\bclass\s*=\s*["'][^"']*\bk-deck\b/i.test(html) ? 'deck' : 'page';
+}
+
+/** One slide in the report that the kit's audit writes to the JSON block with the id k-deck-report. */
+export interface SlideAudit {
+  id: string;
+  n: number;
+  layout: string;
+  /** How far the content runs past the canvas, in canvas pixels. */
+  y: number;
+  x: number;
+  /** Paths of the boxes that hide part of their own content. */
+  clip: string[];
+  /** Paths of the text under the minimum size. */
+  tiny: string[];
+  fail: boolean;
+}
+export interface DeckAudit {
+  pass: boolean;
+  slides: SlideAudit[];
+}
+
+/** Reads the deck report from the rendered HTML that Browser Rendering returns. Returns null when the page wrote none. */
+export function auditFromHtml(html: string): DeckAudit | null {
+  // The last match: the runtime appends the block to <body>, after any inlined kit script.
+  const m = [...html.matchAll(/<script\b(?=[^>]*\btype="application\/json")[^>]*\bid="k-deck-report"[^>]*>([\s\S]*?)<\/script>/g)].pop();
+  if (!m) return null;
+  try {
+    const r = JSON.parse(m[1]) as DeckAudit;
+    return Array.isArray(r.slides) ? { pass: !!r.pass, slides: r.slides } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The fix for an overflow of this many canvas pixels. */
+export function overflowFix(px: number): string {
+  if (px <= 40) return 'move elements a little';
+  if (px <= 90) return 'make the gaps smaller';
+  if (px <= 160) return 'make a title or paragraph smaller';
+  return 'change the layout or split the slide';
+}
+
+/** One line for each problem slide, for the publish output. */
+export function auditLines(a: DeckAudit): string[] {
+  return a.slides.flatMap((s) => {
+    const out: string[] = [];
+    const at = `slide ${s.n} (#${s.id})`;
+    if (s.y > 1) out.push(`${at}: the content is ${s.y}px taller than the slide. Fix: ${overflowFix(s.y)}`);
+    if (s.x > 1) out.push(`${at}: the content is ${s.x}px wider than the slide`);
+    s.clip.forEach((c) => out.push(`${at}: a box hides part of its content: ${c}`));
+    if (s.tiny.length) out.push(`${at}: ${s.tiny.length} text ${s.tiny.length === 1 ? 'element is' : 'elements are'} under the minimum size, first: ${s.tiny[0]}`);
+    return out;
+  });
 }

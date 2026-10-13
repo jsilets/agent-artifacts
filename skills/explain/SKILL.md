@@ -13,7 +13,7 @@ Infer the audience, prior knowledge, and purpose from the request. Ask only when
 
 - **Teaching.** Explain necessary terms and the mechanism. Use a concrete example when it helps. An extended lesson can include a practice question with an answer the reader can check.
 - **Documents.** Include the context, evidence, decisions, and required actions an independent reader needs. Preserve an existing outline unless restructuring is requested or necessary.
-- **Presentations.** For a live talk, keep each slide focused and put supporting detail in notes. A deck read alone needs enough explanation without a presenter. Follow the requested template.
+- **Presentations.** Keep each slide to one point, and give it enough explanation to make sense without a presenter. Decks have no speaker notes. Follow the requested template. Make a deck with `agent-pages new --deck` and read [references/slides.md](references/slides.md) first.
 
 A shared page must make sense without this chat. Keep essential context in the page and production details out of it.
 
@@ -70,7 +70,7 @@ For substantial work, use a separate reader review when available and appropriat
 
 ## Make, check, and show the HTML
 
-Read [references/exhibits.md](references/exhibits.md) for markup and consult [examples/gallery.html](examples/gallery.html) for component examples. The CLI and `kit/explain.css` and `kit/explain.js` live in the Agent Pages repo.
+Read [references/exhibits.md](references/exhibits.md) for markup and consult [examples/gallery.html](examples/gallery.html) for component examples. For a diagram with its own geometry, such as a sequence, a timeline or a Sankey, start from a template: read [diagrams/index.md](diagrams/index.md). The CLI and `kit/explain.css` and `kit/explain.js` live in the Agent Pages repo.
 
 Use the kit for consistent appearance. Add custom styling only for a needed chart or diagram the kit cannot express. Keep colors consistent, labels readable, and status understandable without color. Give diagrams a textual equivalent.
 
