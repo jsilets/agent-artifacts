@@ -6,9 +6,10 @@ The repo has four parts:
 
 | Folder | What it holds |
 |---|---|
-| `skills/explain/` | The `explain` skill creates HTML explanations, lessons, documents, and presentations. It guides content, emphasis, and the choice of prose, tables, charts, or diagrams within each page. |
+| `skills/explain/` | The `explain` skill creates HTML explanations, lessons, documents, and presentations. It guides content, emphasis, and the choice of prose, tables, charts, or diagrams within each page. `diagrams/` holds 64 diagram templates from diagram-design. |
 | `kit/` | `explain.css` and `explain.js`: the look and the runtime that every page shares. |
 | `brand/` | The mark. `mark.svg` is the master, `mark-small.svg` is the cut for 16 to 32 px with thicker parts and a bolder heading line (the favicon), and `mark-square.svg` is for platforms that round the corners. `favicon.ico` and `apple-touch-icon.png` are rendered from them. |
+| `tools/` | `port-diagram-design.mjs` copies the diagram-design templates into `skills/explain/diagrams/`. Run it again to take a newer version. |
 | `cli/` | `agent-pages`: `new`, `check`, `pack`, `serve`, `publish` and `list`. Node 18 or later, no dependencies. |
 | `host/` | A Cloudflare Worker: the library, the viewer, the API and the share links. |
 
@@ -40,6 +41,7 @@ Without a host, the skill still works. Pages go to `~/.agent/explain/<repo>/`, a
 - The viewer shows each page in an `<iframe>` with the `sandbox` attribute. The page HTML comes from a route that sends `Content-Security-Policy: sandbox`. So the script in a page runs with no origin, and it cannot read the host's cookies or call its API.
 - Cloudflare Access protects the whole hostname. A person signs in with Access. The CLI sends an Access service token.
 - The Worker checks the Access JWT on each request too. Access at the edge is the first check, and the Worker is the second.
+- A page whose `<main>` has the class `k-deck` is a deck, and D1 stores `kind = 'deck'` for it. At publish time, Browser Rendering opens the deck at 1920×1080, and the kit reports the slides that overflow. The publish response returns that audit, and the CLI prints it. The deck thumbnails show the first slide.
 - A second Access application bypasses Access for `/s/*`. On that path the Worker checks only the share token, which is 32 random bytes.
 
 | Route | Auth | Does |
@@ -49,6 +51,7 @@ Without a host, the skill still works. Pages go to `~/.agent/explain/<repo>/`, a
 | `GET /p/<group>/<name>/v/<n>` | Access | The viewer for one version |
 | `GET /raw/<group>/<name>/<n>` | Access | The page HTML, with the sandbox CSP |
 | `GET /t/<group>/<name>/<n>/<light or dark>.webp` | Access | A thumbnail |
+| `GET /pdf/<group>/<name>/<n>` | Access | A deck as a PDF, one page for each slide. The host caches it in R2. |
 | `GET /s/_/favicon.svg`, `favicon.ico`, `apple-touch-icon.png` | None | The site icons, which share links show too |
 | `GET /api/pages` | Access | The page list as JSON |
 | `GET /api/search?q=<words>` | Access | The best match on each page, best page first |
@@ -59,6 +62,7 @@ Without a host, the skill still works. Pages go to `~/.agent/explain/<repo>/`, a
 | `GET`, `POST /api/pages/<group>/<name>/shares` | Access | List or make share links. POST body: `{ "version": n }` or `{ "version": "latest" }` |
 | `DELETE /api/shares/<token>` | Access | Revoke a share link |
 | `GET /s/<token>` | Token | The shared page |
+| `GET /s/<token>/pdf` | Token | The shared deck as a PDF |
 
 ## Deploy the host
 

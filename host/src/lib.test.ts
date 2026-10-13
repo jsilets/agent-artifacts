@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blobKey, ftsQuery, isSlug, isToken, newToken, pageChunks, parseMeta, parseTheme, plainText, route, thumbKey, withKit, withTheme } from './lib';
+import { auditFromHtml, auditLines, blobKey, ftsQuery, isSlug, isToken, newToken, overflowFix, pageChunks, pageKind, parseMeta, parseTheme, pdfKey, plainText, route, thumbKey, withKit, withTheme } from './lib';
 
 describe('isSlug', () => {
   it('takes <group>/<name>', () => {
@@ -82,7 +82,16 @@ describe('withKit', () => {
     expect(withKit(html, '/* explain.css: new */')).toBe(html);
   });
   it('keeps dollar signs in the CSS', () => {
-    expect(withKit(page('/* explain.css */'), '/* explain.css */ a::after{content:"$$"}')).toContain('"$$"');
+    expect(withKit(page('/* explain.css */'), '/* explain.css */ a::after{content:"$"}')).toContain('"$"');
+  });
+  const packed = (js: string) => page('/* explain.css: old */') + `<p>x</p><script>\n${js}\n</script>\n</body>`;
+  it('swaps the packed JS for the current JS', () => {
+    expect(withKit(packed('/* explain.js: old */ a("<\\/script>")'), '/* explain.css: new */', '/* explain.js: new */ b("</script>")'))
+      .toBe(page('/* explain.css: new */') + '<p>x</p><script>\n/* explain.js: new */ b("<\\/script>")\n</script>\n</body>');
+  });
+  it('keeps a page script that is not the kit', () => {
+    const html = page('/* explain.css */') + '<script>\nlet x = 1;\n</script>';
+    expect(withKit(html, '/* explain.css */', '/* explain.js: new */')).toBe(html);
   });
 });
 
@@ -146,5 +155,39 @@ describe('pageChunks', () => {
   });
   it('decodes entities', () => {
     expect(plainText('a&nbsp;&rarr;&#x42;&#67;')).toBe('a →BC');
+  });
+});
+
+describe('decks', () => {
+  it('knows a deck by <main class="k-deck">', () => {
+    expect(pageKind('<html><body><main class="k-deck"><section class="k-claim k-slide">')).toBe('deck');
+    expect(pageKind('<html><body><main class="k-page">')).toBe('page');
+    expect(pageKind('<p>k-deck is a word here</p>')).toBe('page');
+  });
+  it('routes deck PDFs', () => {
+    expect(route('/pdf/a/b/3')).toEqual({ kind: 'pdf', slug: 'a/b', version: 3 });
+    const t = newToken();
+    expect(route(`/s/${t}/pdf`)).toEqual({ kind: 'share-pdf', token: t });
+    expect(route('/pdf/a/b/x').kind).toBe('not-found');
+    expect(pdfKey('a/b', 3, 'k1')).toBe('pages/a/b/3.k1.pdf');
+  });
+  it('reads the audit report from the rendered HTML', () => {
+    const report = { v: 1, pass: false, slides: [{ id: 'too-much', n: 7, layout: 'bullets', y: 283, x: 0, clip: [], tiny: [], fail: true }] };
+    const a = auditFromHtml(`<html data-k-deck="ready"><body><main class="k-deck"></main><script type="application/json" id="k-deck-report">${JSON.stringify(report)}</script></body></html>`)!;
+    expect(a.pass).toBe(false);
+    expect(auditLines(a)).toEqual(['slide 7 (#too-much): the content is 283px taller than the slide. Fix: change the layout or split the slide']);
+    expect(auditFromHtml('<html><body>no report</body></html>')).toBe(null);
+    expect(auditFromHtml('<script id="k-deck-report">not json</script>')).toBe(null);
+  });
+  it('picks a fix by the size of the overflow', () => {
+    expect([12, 60, 120, 400].map(overflowFix)).toEqual(['move elements a little', 'make the gaps smaller', 'make a title or paragraph smaller', 'change the layout or split the slide']);
+  });
+});
+
+describe('auditFromHtml with an inlined kit', () => {
+  it('skips a script that only mentions the report id', () => {
+    const report = { pass: true, slides: [] };
+    const html = `<script>/* writes <script type="application/json" id="k-deck-report"> */ const x = 1;</script><body><script type="application/json" id="k-deck-report">${JSON.stringify(report)}</script>`;
+    expect(auditFromHtml(html)).toEqual({ pass: true, slides: [] });
   });
 });

@@ -1,6 +1,6 @@
 # Exhibits
 
-The markup for kit components. `examples/gallery.html` shows them on one page. Wrap a self-contained exhibit in `<figure>` with a useful `<figcaption>`. Prose, lists, and reference tables can stand outside figures. Select components by the reader's task, not by item counts.
+The markup for kit components. `examples/gallery.html` shows them on one page. `diagrams/` holds 64 diagram templates, and `examples/diagrams.html` shows them. Wrap a self-contained exhibit in `<figure>` with a useful `<figcaption>`. Prose, lists, and reference tables can stand outside figures. Select components by the reader's task, not by item counts.
 
 Use components to expose relationships and make comparisons easy to scan. Keep diagrams that save the reader from reconstructing connections across paragraphs. A supporting value often belongs in an existing label, caption, cell, or sentence. The gallery demonstrates available components; it is not a checklist for each page.
 
@@ -29,20 +29,27 @@ The runtime lays out and draws the diagram. You write a text spec. You never com
 ```html
 <div class="k-flow"><script type="text/plain">
   dir LR                                  // LR = left to right; TB (default) = top to bottom
-  src = State site / scraped hourly [teal] // id = Label / subtitle [shape, ramp]
-  col = Collector / collector.ts [purple]
-  db  = Postgres / bills, votes [db, purple]
+  legend                                  // a legend row for the marks and arrows that the flow uses
+  src = State site / scraped hourly [teal, tag:ext] // id = Label / subtitle [shape, ramp, tag:name]
+  col = Collector / collector.ts [purple, tag:job]
+  db  = Postgres / bills, votes [db, purple, tag:store]
   q   = Media queue [amber]
-  - old = Old cron [gray]                 // marks: + new, - gone, ~ changed, ! highlight
+  - old = Old cron [gray]                 // marks: + new, - gone, ~ changed, ! focal (accent)
     Runs at 02:00 only.                   // an indented line is detail, shown on hover
-  src -> col : polls every 15 min         // -> solid · --> dashed (sometimes) · => bold (main path)
+  src => col : polls every 15 min         // -> solid · --> dashed (sometimes) · => main path (accent)
   col -> db : upserts                     // <-> two-way · label after the colon: action or condition
   col --> q : on new video
-  group "Ingest": src col                 // dashed box around nodes
+  zone "Ingest · every 15 min": src col   // a filled band with a caps label
+  group "Storage": db                     // a dashed box with a caps label
 </script></div>
 ```
 
 - Shapes: `box` (default) `pill` `db` `diamond` `circle` `note` `hex` `actor`.
+- A `tag:name` puts a small caps type tag on the node, such as `ext`, `api` or `store`. Use 12 characters at most. Tag every node or none.
+- Use `=>` for the one path the reader should follow, and `!` for 1 or 2 focal nodes. Both take the accent color, so keep them rare.
+- Use `zone` for a stage or a time scale, such as "Real time · seconds". Use `group` for a boundary, such as a deploy unit. The runtime puts each label in a corner that no arrow crosses.
+- Add `legend` when the flow mixes solid, dashed and main-path arrows or has a focal node.
+- Add `data-paper="dots"` to the `.k-flow` element for a dotted background. The default has none.
 - To place nodes yourself, use grid rows. Every node then needs a cell; `.` is an empty cell.
   ```
   | src | col | db |
@@ -154,7 +161,24 @@ Three cells for each row: the item, the score and one reason. Define the scoring
 - The runtime adds a Reset button. `check` evaluates every expression at the default inputs.
 - Label every assumed number as an assumption in the caption. Do not invent data and show it as real.
 
-## Mermaid: sequences and states only
+## .k-diagram: a template for other geometry
+
+When the subject has its own geometry, start from a template in `diagrams/`: a sequence, swimlane, timeline, quadrant, Sankey, state machine, ER model, Gantt, chart, or one of the others. Read [../diagrams/index.md](../diagrams/index.md) first. It lists the templates, the palette, and the rules for adapting one.
+
+```html
+<figure class="k-diagram" data-tpl="sequence">
+<div class="k-art">
+<svg viewBox="0 0 1000 584" role="img" aria-labelledby="sequence-title sequence-desc"> … copied from diagrams/sequence.html … </svg>
+</div>
+<figcaption>What the reader should see in the diagram.</figcaption>
+</figure>
+```
+
+- Copy the whole figure, then change the text, the data and the geometry. Keep the template colors; the kit maps them to the page theme.
+- The figure grows past the text column to 1000 px when the window has room. Do not put it inside a `.k-scroll` or a grid.
+- Add `data-paper="dots"` to the figure for the dotted background. The default has none.
+
+## Mermaid: only when no template fits
 
 ```html
 <pre class="mermaid">
@@ -165,11 +189,11 @@ sequenceDiagram
 </pre>
 ```
 
-The runtime loads Mermaid from a CDN and colors it from the kit. Prefer `.k-flow` for supported flows. Use custom SVG when the subject needs different geometry.
+The runtime loads Mermaid from a CDN and colors it from the kit. Prefer the `sequence` and `state` templates. They match the kit and need no CDN.
 
-## Hand-drawn SVG: only when no exhibit fits
+## Hand-drawn SVG: only when no exhibit or template fits
 
-Use it for a chart or diagram with its own geometry, such as a timeline with real dates or a physical layout. These layout defaults come from OpenIntelligentUI. Adapt the dimensions when needed and inspect the result.
+Use it for a chart or diagram with its own geometry that no template covers. These layout defaults come from OpenIntelligentUI. Follow the connector rules in [../diagrams/index.md](../diagrams/index.md). Adapt the dimensions when needed and inspect the result.
 
 - `<svg viewBox="0 0 680 H" width="100%">`. Keep content between x=40 and x=640. H is the lowest element's bottom edge plus 40.
 - Boxes: `<g class="c-teal"><rect class="box" … rx="8"/><text class="th" …>Title</text><text class="ts" …>subtitle</text></g>`.
