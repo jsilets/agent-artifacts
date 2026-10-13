@@ -1,6 +1,7 @@
 // agent-pages: stores HTML pages with versions, shows them in a sandboxed viewer,
 // and serves share links. See ../README.md for the routes and the auth model.
 import kitCss from '../../kit/explain.css?raw';
+import kitJs from '../../kit/explain.js?raw';
 import faviconSvg from '../../brand/mark-small.svg?raw';
 import faviconIco from '../../brand/favicon.ico?inline';
 import touchIcon from '../../brand/apple-touch-icon.png?inline';
@@ -69,7 +70,7 @@ function withClaimIds(res: Response) {
 }
 
 async function rawPage(obj: R2ObjectBody, immutable: boolean, theme: Theme | null) {
-  const html = withKit(await obj.text(), kitCss);
+  const html = withKit(await obj.text(), kitCss, kitJs);
   const body = theme ? withTheme(html, theme) : html;
   return withClaimIds(new Response(body, {
     headers: {
@@ -126,7 +127,7 @@ async function makeThumbs(env: Env, slug: string, version: number, html: string)
   for (const theme of ['light', 'dark'] as const) {
     const res = await env.BROWSER.quickAction('screenshot', {
       // data-k-capture makes the kit show the first slide alone, with no toolbar or sidebar.
-      html: withTheme(withKit(deck ? html.replace(/<html\b/i, '<html data-k-capture') : html, kitCss), theme),
+      html: withTheme(withKit(deck ? html.replace(/<html\b/i, '<html data-k-capture') : html, kitCss, kitJs), theme),
       viewport: deck ? { width: 960, height: 540 } : { width: 960, height: 600 },
       ...(deck ? { waitForSelector: { selector: 'html[data-k-deck="ready"]', timeout: 20000 } } : {}),
       // The kit fades each block in. Stop that, so the shot shows the finished page.
@@ -145,7 +146,7 @@ async function makeThumbs(env: Env, slug: string, version: number, html: string)
 async function auditDeck(env: Env, html: string): Promise<DeckAudit | { error: string }> {
   try {
     const res = await env.BROWSER.quickAction('content', {
-      html: withTheme(withKit(html, kitCss), 'light'),
+      html: withTheme(withKit(html, kitCss, kitJs), 'light'),
       viewport: { width: 1920, height: 1080 },
       waitForSelector: { selector: 'html[data-k-deck="ready"]', timeout: 20000 },
       gotoOptions: { waitUntil: 'networkidle0', timeout: 20000 },
@@ -169,7 +170,7 @@ async function deckPdf(env: Env, slug: string, version: number, filename: string
     const obj = await env.PAGES.get(blobKey(slug, version));
     if (!obj) return fail(404, 'no such version');
     const res = await env.BROWSER.quickAction('pdf', {
-      html: withTheme(withKit(await obj.text(), kitCss), 'light'),
+      html: withTheme(withKit(await obj.text(), kitCss, kitJs), 'light'),
       viewport: { width: 1920, height: 1080 },
       emulateMediaType: 'print',
       waitForSelector: { selector: 'html[data-k-deck="ready"]', timeout: 20000 },

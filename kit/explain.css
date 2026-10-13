@@ -148,8 +148,6 @@ svg text.th { font-size: 14px; font-weight: 500; fill: var(--ink, var(--p)); }
 svg text.t  { font-size: 14px; font-weight: 400; fill: var(--ink, var(--p)); }
 svg text.ts { font-size: 12px; font-weight: 400; fill: var(--sub, var(--s)); }
 svg text.tl { font-size: 12px; font-weight: 400; fill: var(--s); }
-.k-flow svg text.th { font-size: 13px; }   /* the flow layout measures labels at this size */
-.k-flow svg text.ts, .k-flow svg text.tl { font-size: 11.5px; }
 svg .box { fill: var(--fill, var(--bg2)); stroke: var(--line, var(--b2)); stroke-width: 0.75; }
 svg .arr { fill: none; stroke: var(--s); stroke-width: 1.5; }
 svg .arr.dash { stroke-dasharray: 5 4; }
@@ -160,6 +158,64 @@ svg .leader { fill: none; stroke: var(--t); stroke-width: 0.75; stroke-dasharray
 svg .mark-new .box { stroke-width: 1.75; }
 svg .mark-gone { opacity: 0.45; }
 svg .mark-hl .box { stroke-width: 2.25; }
+
+/* ─── Flow look (after diagram-design, MIT, Cathryn Lavery. See ../NOTICE.md) ───
+   The flow layout measures a name at 13 px, a sublabel at 11 px mono, an arrow label at 10 px mono caps
+   and a zone label at 9.5 px mono caps. Change these sizes only together with the widths in layoutFlow. */
+:root { --d-accent: #993C1D; --d-node: #ffffff; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --d-accent: #F0997B; --d-node: var(--bg2); } }
+:root[data-theme="dark"] { --d-accent: #F0997B; --d-node: var(--bg2); }
+.k-flow svg .box { fill: var(--fill, var(--d-node)); stroke: var(--line, color-mix(in srgb, var(--p) 55%, transparent)); stroke-width: 1; }
+.k-flow svg text.fn { font-size: 13px; font-weight: 600; fill: var(--ink, var(--p)); }
+.k-flow svg text.fs { font: 400 11px var(--mono); fill: var(--sub, var(--s)); }
+.k-flow svg .ftag { fill: none; stroke: var(--line, var(--s)); stroke-width: 0.75; opacity: 0.8; }
+.k-flow svg text.ftt { font: 500 8px var(--mono); letter-spacing: 0.06em; fill: var(--sub, var(--s)); }
+.k-flow svg .arr { stroke-width: 1.25; }
+.k-flow svg .arr.main { stroke: var(--d-accent); stroke-width: 1.75; }
+.k-flow svg .fm { fill: var(--s); }
+.k-flow svg .fm.main { fill: var(--d-accent); }
+.k-flow svg .lbl-bg { fill: var(--bg); }
+.k-flow svg text.fl { font: 500 10px var(--mono); letter-spacing: 0.05em; fill: var(--s); }
+.k-flow svg text.fl.main { fill: var(--d-accent); }
+.k-flow svg text.fe { font: 500 9.5px var(--mono); letter-spacing: 0.14em; fill: var(--s); }
+.k-flow svg .zone { fill: color-mix(in srgb, var(--p) 4.5%, transparent); }
+.k-flow svg .zone-bg { fill: color-mix(in srgb, var(--p) 4.5%, var(--bg)); }
+.k-flow svg .grp { stroke: color-mix(in srgb, var(--p) 30%, transparent); stroke-dasharray: 4 3; }
+.k-flow svg .rule { stroke: var(--b); stroke-width: 1; }
+.k-flow svg text.flg { font-size: 11px; fill: var(--s); }
+.k-flow svg .fdot { fill: color-mix(in srgb, var(--p) 10%, transparent); }
+.k-flow svg .mark-hl .box { fill: color-mix(in srgb, var(--d-accent) 10%, var(--bg)); stroke: var(--d-accent); stroke-width: 1.25; }
+.k-flow svg .mark-hl :is(text.fn, text.fs, text.ftt) { fill: var(--d-accent); }
+.k-flow svg .mark-hl .ftag { stroke: var(--d-accent); }
+
+/* ─── Diagram templates: <figure class="k-diagram"> ───────────────────
+   The templates come from diagram-design (MIT, Cathryn Lavery). See ../NOTICE.md and skills/explain/diagrams.
+   explain.js maps each palette color in a template to one of these tokens.
+   The figure grows past the text column to 1000 px when the window has room, so 8 px template text draws at 8 px.
+   On a narrow window it scrolls sideways inside its own frame. A slide keeps the figure in its own box. */
+.k-diagram {
+  --d-ink: var(--p); --d-muted: var(--s); --d-soft: var(--s); --d-link: var(--link);
+  --d-paper: var(--bg); --d-paper-2: var(--bg2);
+  --d-ink-2: color-mix(in srgb, var(--d-ink) 80%, var(--d-paper)); --d-muted-2: color-mix(in srgb, var(--d-muted) 45%, var(--d-paper));
+  width: min(1000px, calc(100vw - 32px)); position: relative; left: 50%; transform: translateX(-50%);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .k-diagram { --d-paper-2: var(--bg3); } }
+:root[data-theme="dark"] .k-diagram { --d-paper-2: var(--bg3); }
+.k-diagram > .k-art { overflow-x: auto; }
+.k-diagram > .k-art > svg { display: block; width: 100%; height: auto; min-width: var(--d-min, 0); }
+.k-diagram > figcaption { max-width: 712px; margin-left: auto; margin-right: auto; }
+.k-diagram svg text { font-family: var(--sans); }
+.k-diagram [font-family*="Mono"] { font-family: var(--mono); }
+.k-diagram [font-family*="Serif"] { font-family: var(--sans); }
+.k-diagram:not([data-paper="dots"]) [fill*="dots)"] { display: none; }
+.k-slide .k-diagram { width: auto; left: auto; transform: none; }
+.k-slide .k-diagram > .k-art { overflow: visible; }
+.k-slide .k-diagram > .k-art > svg { min-width: 0; }
+/* On a figure slide, a flow or a template scales to fit the space under the heading. */
+.k-slide[data-layout="figure"] > figure > :is(.k-flow, .k-art) { flex: 1; min-height: 0; }
+.k-slide[data-layout="figure"] > figure > :is(.k-flow, .k-art) > svg { width: 100%; height: 100%; max-width: none; }
+/* The audit measures each slide again at natural height. A fitted diagram scales instead of clipping, so that pass leaves it out. */
+.k-slide.k-natural[data-layout="figure"] > figure > :is(.k-flow, .k-art) { display: none; }
 
 /* ─── Layers: stacked bands for architecture ─────────────────────── */
 .k-layers { display: grid; gap: 6px; }

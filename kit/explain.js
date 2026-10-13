@@ -1,5 +1,5 @@
 /* explain.js: the runtime for explain pages. One file, no dependencies.
-   It draws .k-flow diagrams, .k-dots scores, .k-model sliders, .k-steps and Mermaid blocks.
+   It draws .k-flow diagrams, .k-diagram templates, .k-dots scores, .k-model sliders, .k-steps and Mermaid blocks.
    In Node (no DOM) it only sets globalThis.Explain, so cli/agent-pages.mjs can lint with the same parsers.
    The flow parser and layout (marked below) come from Anthropic's html-plan skill. See ../NOTICE.md. */
 (function () {
@@ -20,17 +20,19 @@ function srcOf(el) {
 }
 
 /* ─── From html-plan (Apache-2.0 / MIT, Anthropic). Changed: TONES uses the kit's color ramps;
-       parseFlow and layoutFlow are local constants instead of properties of a namespace. ─── */
+       parseFlow and layoutFlow are local constants instead of properties of a namespace;
+       parseFlow reads tag:, zone and legend; layoutFlow reserves a row for a tag, pads groups by 22 px
+       at the bottom, and places each group label in a corner that no arrow crosses. ─── */
 const MARK = { '+': 'new', '-': 'gone', '~': 'mod', '!': 'hl' };
 function takeMark(line) { const m = line.match(/^([+\-~!])\s+(?=\S)|^([+\-!])(?=[A-Za-z_])/); return m && !/^--/.test(line) && !/^->/.test(line) ? [MARK[m[1] || m[2]], line.slice(m[0].length)] : [null, line]; }
 const SHAPES = new Set(['box', 'pill', 'diamond', 'db', 'circle', 'note', 'hex', 'actor']);
 const TONES = new Set(['gray', 'purple', 'teal', 'coral', 'pink', 'blue', 'green', 'amber', 'red', 'accent', 'muted', 'ink']);
 const EDGE_RE = /^(\S+)\s+(<?)(-->|->|=>|==>|-x->|\.\.>)\s*(\S+?)(?:\s*:\s*(.*))?$/;
 
-/** Flow DSL → { nodes:{id:{id,label,sub,shape,tone,mark,href,detail}}, edges:[], grid:[[id|null]], groups:[], dir, errors:[] } */
+/** Flow DSL → { nodes:{id:{id,label,sub,shape,tone,mark,href,tag,detail}}, edges:[], grid:[[id|null]], groups:[{label,ids,zone}], dir, legend, errors:[] } */
 const parseFlow = function parseFlow(text) {
-  const m = { nodes: {}, order: [], edges: [], grid: [], groups: [], dir: 'TB', errors: [] };
-  const node = (id, ln) => { if (!/^[\w.-]+$/.test(id)) m.errors.push(`line ${ln}: bad node id "${id}"`); if (!m.nodes[id]) { m.nodes[id] = { id, label: id, sub: '', shape: 'box', tone: '', mark: null, href: '', detail: [] }; m.order.push(id); } return m.nodes[id]; };
+  const m = { nodes: {}, order: [], edges: [], grid: [], groups: [], dir: 'TB', legend: false, errors: [] };
+  const node = (id, ln) => { if (!/^[\w.-]+$/.test(id)) m.errors.push(`line ${ln}: bad node id "${id}"`); if (!m.nodes[id]) { m.nodes[id] = { id, label: id, sub: '', shape: 'box', tone: '', mark: null, href: '', tag: '', detail: [] }; m.order.push(id); } return m.nodes[id]; };
   let last = null;
   text.split('\n').forEach((raw, i) => {
     const ln = i + 1;
@@ -40,13 +42,14 @@ const parseFlow = function parseFlow(text) {
     let [mark, rest] = takeMark(line); line = rest;
     let mm;
     if ((mm = line.match(/^dir\s*[:=]?\s*(LR|TB)$/i))) { m.dir = mm[1].toUpperCase(); return; }
+    if (/^legend$/i.test(line)) { m.legend = true; return; }
     if (line.startsWith('|')) {                                                     // grid row
       const cells = line.replace(/^\||\|$/g, '').split('|').map((c) => c.trim());
       m.grid.push(cells.map((c) => (c && c !== '.' && c !== '·') ? (node(c, ln), c) : null)); return;
     }
-    if ((mm = line.match(/^group\s+(?:"([^"]+)"|([^:]+?))\s*:\s*(.+)$/i))) {
-      const ids = mm[3].split(/[\s,]+/).filter(Boolean); ids.forEach((id) => node(id, ln));
-      m.groups.push({ label: mm[1] || mm[2], ids, tone: '' }); return;
+    if ((mm = line.match(/^(group|zone)\s+(?:"([^"]+)"|([^:]+?))\s*:\s*(.+)$/i))) {
+      const ids = mm[4].split(/[\s,]+/).filter(Boolean); ids.forEach((id) => node(id, ln));
+      m.groups.push({ label: mm[2] || mm[3], ids, tone: '', zone: mm[1].toLowerCase() === 'zone' }); return;
     }
     if ((mm = line.match(EDGE_RE))) {
       const [, a, back, op, b, label] = mm; node(a, ln); node(b, ln);
@@ -55,12 +58,12 @@ const parseFlow = function parseFlow(text) {
     if ((mm = line.match(/^([\w.-]+)\s*=\s*(.*)$/))) {                               // node def
       const n = node(mm[1], ln); let body = mm[2];
       const attr = body.match(/\[([^\]]*)\]\s*$/); if (attr) { body = body.slice(0, attr.index).trim();
-        attr[1].split(/[\s,]+/).filter(Boolean).forEach((t) => { if (SHAPES.has(t)) n.shape = t; else if (TONES.has(t)) n.tone = t; else if (t.startsWith('#')) n.href = t; else m.errors.push(`line ${ln}: unknown node attribute "${t}" (shapes: ${[...SHAPES].join(' ')}; tones: ${[...TONES].join(' ')})`); }); }
+        attr[1].split(/[\s,]+/).filter(Boolean).forEach((t) => { if (SHAPES.has(t)) n.shape = t; else if (TONES.has(t)) n.tone = t; else if (t.startsWith('#')) n.href = t; else if (/^tag:[\w.-]{1,12}$/.test(t)) n.tag = t.slice(4).toUpperCase(); else m.errors.push(`line ${ln}: unknown node attribute "${t}" (shapes: ${[...SHAPES].join(' ')}; tones: ${[...TONES].join(' ')}; tag:name, 12 characters at most)`); }); }
       const parts = body.split(/\s+\/\s+/); n.label = parts[0].replace(/\\n/g, '\n') || n.id; n.sub = parts.slice(1).join(' / ');
       if (mark) n.mark = mark; last = n; return;
     }
     if (/^[\w.-]+$/.test(line)) { const n = node(line, ln); if (mark) n.mark = mark; last = n; return; }
-    m.errors.push(`line ${ln}: couldn't parse "${line}" — expected  id = Label [attrs]  |  a -> b : label  |  | a | b |  |  group Name: a b`);
+    m.errors.push(`line ${ln}: couldn't parse "${line}" — expected  id = Label [attrs]  |  a -> b : label  |  | a | b |  |  group Name: a b  |  zone Name: a b  |  legend`);
   });
   // grid sanity
   const seen = {}; m.grid.forEach((row, r) => row.forEach((id, c) => { if (!id) return; if (seen[id]) m.errors.push(`grid: "${id}" appears twice (${seen[id]} and ${r},${c})`); seen[id] = `${r},${c}`; }));
@@ -77,7 +80,7 @@ const layoutFlow = function layoutFlow(m, opt = {}) {
   const wrap = (s) => { const out = []; String(s).split('\n').forEach((para) => { let cur = ''; para.split(/\s+/).filter(Boolean).flatMap(soft).forEach(({ t, sp }) => { const join = cur ? cur + (sp ? ' ' : '') + t : t; if (join.length > wrapAt && cur) { out.push(cur); cur = t; } else cur = join; }); if (cur) out.push(cur); }); return out.length ? out : ['']; };
   const wrapSub = (t) => { t = String(t || ''); if (t.length <= 24) return t ? [t] : []; const mid = Math.round(t.length / 2); let at = -1; for (let d = 0; d < mid; d++) { if (/[\s/·,]/.test(t[mid - d])) { at = mid - d; break; } if (/[\s/·,]/.test(t[mid + d])) { at = mid + d; break; } } return at > 0 ? [t.slice(0, at + (t[at] === ' ' ? 0 : 1)).trim(), t.slice(at + 1).trim()] : [t]; };
   Object.values(m.nodes).forEach((n) => { n.lines = wrap(n.label); n.subLines = wrapSub(n.sub); });
-  const maxLines = Math.max(...Object.values(m.nodes).map((n) => n.lines.length + n.subLines.length * 0.85));
+  const maxLines = Math.max(...Object.values(m.nodes).map((n) => n.lines.length + n.subLines.length * 0.85 + (n.tag ? 1 : 0)));
   const longest = Math.max(...Object.values(m.nodes).flatMap((n) => { const pad = n.shape === 'actor' ? 22 : 0; return [...n.lines.map((l) => l.length * 7.3 + pad), ...n.subLines.map((l) => l.length * 6.5 + pad)]; }));
   const splitLbl = (t) => { t = String(t || ''); if (t.length <= 22) return t ? [t] : []; const mid = Math.round(t.length / 2); let at = -1; for (let d = 0; d < mid; d++) { if (t[mid - d] === ' ') { at = mid - d; break; } if (t[mid + d] === ' ') { at = mid + d; break; } } return at > 0 ? [t.slice(0, at), t.slice(at + 1)] : [t]; };
   m.edges.forEach((e) => { e.lines = splitLbl(e.label); e.tw = e.lines.length ? Math.max(24, Math.max(...e.lines.map((l) => l.length)) * 6.4 + 12) : 0; e.th = e.lines.length > 1 ? 30 : 18; });
@@ -103,7 +106,7 @@ const layoutFlow = function layoutFlow(m, opt = {}) {
   const boxes = {}; let W = 0, H = 0;
   ids.forEach((id) => { const cell = cells[id]; if (!cell) return; const n = m.nodes[id]; const x = PAD + cell.c * (NWID + GX), y = PAD + cell.r * (NH + GY); boxes[id] = { id, x, y, w: NWID, h: NH, cx: x + NWID / 2, cy: y + NH / 2, c: cell.c, r: cell.r, n }; W = Math.max(W, x + NWID + PAD); H = Math.max(H, y + NH + PAD); });
   // groups
-  const groups = m.groups.map((g) => { const bs = g.ids.map((id) => boxes[id]).filter(Boolean); if (!bs.length) return null; const x0 = Math.min(...bs.map((b) => b.x)) - 14, y0 = Math.min(...bs.map((b) => b.y)) - 22, x1 = Math.max(...bs.map((b) => b.x + b.w)) + 14, y1 = Math.max(...bs.map((b) => b.y + b.h)) + 14; W = Math.max(W, x1 + 8); H = Math.max(H, y1 + 8); return { label: g.label, x: x0, y: y0, w: x1 - x0, h: y1 - y0 }; }).filter(Boolean);
+  const groups = m.groups.map((g) => { const bs = g.ids.map((id) => boxes[id]).filter(Boolean); if (!bs.length) return null; const x0 = Math.min(...bs.map((b) => b.x)) - 14, y0 = Math.min(...bs.map((b) => b.y)) - 22, x1 = Math.max(...bs.map((b) => b.x + b.w)) + 14, y1 = Math.max(...bs.map((b) => b.y + b.h)) + 22; W = Math.max(W, x1 + 8); H = Math.max(H, y1 + 8); return { label: g.label, zone: !!g.zone, x: x0, y: y0, w: x1 - x0, h: y1 - y0 }; }).filter(Boolean);
   if (groups.length) { const miny = Math.min(0, ...groups.map((g) => g.y - 6)); if (miny < 0) { Object.values(boxes).forEach((b) => { b.y -= miny; b.cy -= miny; }); groups.forEach((g) => { g.y -= miny; }); H -= miny; } }
   // routing
   const occupied = (x, y, skip) => Object.values(boxes).some((b) => !skip.includes(b.id) && x > b.x - 4 && x < b.x + b.w + 4 && y > b.y - 4 && y < b.y + b.h + 4);
@@ -171,6 +174,21 @@ const layoutFlow = function layoutFlow(m, opt = {}) {
     const ok = cands.find(([x, y]) => !bad(x, y) && !onOther(x, y)) || cands.find(([x, y]) => !bad(x, y)) || cands[0];
     [r.lx, r.ly] = ok; placed.push({ x: ok[0], y: ok[1], w: tw, h: th }); W = Math.max(W, ok[0] + tw / 2 + 6); H = Math.max(H, ok[1] + th / 2 + 6);
   });
+  // 4) group labels: try the four inside corners of the group padding, top-left first. Keep the first corner
+  //    that no arrow and no arrow label crosses. If every corner is blocked, keep top-left and set clash,
+  //    so the drawing puts a mask behind the label.
+  const allSegs = routes.flatMap((r) => r.segs);
+  const hitSeg = (x0, y0, x1, y1) => allSegs.some(([ax, ay, bx, by]) => Math.max(ax, bx) >= x0 && Math.min(ax, bx) <= x1 && Math.max(ay, by) >= y0 && Math.min(ay, by) <= y1);
+  const hitLbl = (x0, y0, x1, y1) => placed.some((q) => q.x + q.w / 2 > x0 && q.x - q.w / 2 < x1 && q.y + q.h / 2 > y0 && q.y - q.h / 2 < y1);
+  const charW = opt.groupCharW || 7.1;
+  groups.forEach((g) => {
+    const lw = g.label.length * charW + 6, lh = 13;
+    const cands = [[g.x + 10, g.y + 4, 'start'], [g.x + g.w - 10, g.y + 4, 'end'], [g.x + 10, g.y + g.h - 4 - lh, 'start'], [g.x + g.w - 10, g.y + g.h - 4 - lh, 'end']];
+    const rect = ([x, y, a]) => a === 'start' ? [x - 3, y, x + lw, y + lh] : [x - lw, y, x + 3, y + lh];
+    const ok = cands.find((c) => { const r = rect(c); return !hitSeg(...r) && !hitLbl(...r); });
+    const [lx, ly, anchor] = ok || cands[0];
+    Object.assign(g, { lx, ly, anchor, lw, lh, clash: !ok });
+  });
   return { W, H, boxes, routes, groups, NH, NWID };
 };
 /* ─── End of html-plan code. ─── */
@@ -224,13 +242,29 @@ function fmt(v, f = 'n1', unit = '') {
   return s.replace(/^-/, '−') + (unit ? ' ' + unit : '');
 }
 
+/* The diagram-design palette, for .k-diagram templates. Each color maps to a kit token in explain.css. */
+const DIAGRAM_PALETTE = { '45,49,66': 'ink', '79,93,117': 'muted', '90,101,128': 'soft', '191,69,32': 'accent', '46,90,168': 'link', '245,245,245': 'paper', '236,236,236': 'paper-2', '255,255,255': 'node', '61,68,96': 'ink-2', '191,192,192': 'muted-2' };
+/** A diagram-design color → a kit CSS value, or null for a color outside the palette. */
+function diagramColor(v) {
+  v = String(v || '').trim().toLowerCase();
+  let rgb, a = 1, mm;
+  if (v === 'white' || v === '#fff') rgb = '255,255,255';
+  else if ((mm = v.match(/^#([0-9a-f]{6})$/))) rgb = [0, 2, 4].map((i) => parseInt(mm[1].slice(i, i + 2), 16)).join(',');
+  else if ((mm = v.match(/^#([0-9a-f]{3})$/))) rgb = [...mm[1]].map((c) => parseInt(c + c, 16)).join(',');
+  else if ((mm = v.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+%?)\s*)?\)$/))) { rgb = [mm[1], mm[2], mm[3]].join(','); if (mm[4] != null) a = mm[4].endsWith('%') ? parseFloat(mm[4]) / 100 : parseFloat(mm[4]); }
+  const role = rgb && DIAGRAM_PALETTE[rgb];
+  if (!role) return null;
+  return a >= 1 ? `var(--d-${role})` : `color-mix(in srgb, var(--d-${role}) ${+(a * 100).toFixed(1)}%, transparent)`;
+}
 /** The slide layouts the kit draws. A slide names one in data-layout. */
 const DECK_LAYOUTS = ['title', 'section', 'statement', 'bullets', 'split', 'figure', 'table', 'stat', 'quote', 'code'];
 
-globalThis.Explain = { parseFlow, layoutFlow, evalExpr, evalDefs, fmt, dedent, DECK_LAYOUTS };
+globalThis.Explain = { parseFlow, layoutFlow, evalExpr, evalDefs, fmt, dedent, diagramColor, DECK_LAYOUTS };
 if (!HAS_DOM) return;
 
-/* ─── Flow → SVG ─── */
+/* ─── Flow → SVG ───
+   The look comes from diagram-design (MIT, Cathryn Lavery): type tags, mono sublabels, mono caps arrow labels,
+   filled zones, the accent on the main path and the focal node, and a legend. See ../NOTICE.md. */
 let flowN = 0;
 function shape(b) {
   const { x, y, w, h, n } = b;
@@ -241,41 +275,114 @@ function shape(b) {
     case 'hex': return `<polygon class="box" points="${x + 14},${y} ${x + w - 14},${y} ${x + w},${b.cy} ${x + w - 14},${y + h} ${x + 14},${y + h} ${x},${b.cy}"/>`;
     case 'note': return `<rect class="box" x="${x}" y="${y}" width="${w}" height="${h}" rx="2" stroke-dasharray="4 3"/>`;
     case 'db': { const e = 7; return `<path class="box" d="M${x},${y + e} a${w / 2},${e} 0 0 1 ${w},0 v${h - 2 * e} a${w / 2},${e} 0 0 1 ${-w},0 z"/><path class="box" style="fill:none" d="M${x},${y + e} a${w / 2},${e} 0 0 0 ${w},0"/>`; }
-    default: return `<rect class="box" x="${x}" y="${y}" width="${w}" height="${h}" rx="8"/>`;
+    default: return `<rect class="box" x="${x}" y="${y}" width="${w}" height="${h}" rx="6"/>`;
   }
+}
+/** A right-angle route with rounded elbows of radius 8. */
+function elbow(pts, r = 8) {
+  const f = (v) => +v.toFixed(1);
+  let d = 'M' + f(pts[0][0]) + ',' + f(pts[0][1]);
+  for (let i = 1; i < pts.length - 1; i++) {
+    const [px, py] = pts[i - 1], [x, y] = pts[i], [nx, ny] = pts[i + 1];
+    const l1 = Math.hypot(x - px, y - py), l2 = Math.hypot(nx - x, ny - y), rr = Math.min(r, l1 / 2, l2 / 2);
+    if (!l1 || !l2) continue;
+    d += ' L' + f(x - ((x - px) / l1) * rr) + ',' + f(y - ((y - py) / l1) * rr) + ' Q' + f(x) + ',' + f(y) + ' ' + f(x + ((nx - x) / l2) * rr) + ',' + f(y + ((ny - y) / l2) * rr);
+  }
+  const z = pts[pts.length - 1];
+  return d + ' L' + f(z[0]) + ',' + f(z[1]);
 }
 function drawFlow(el) {
   const m = parseFlow(srcOf(el));
   const L = layoutFlow(m);
   const id = 'kf' + (++flowN);
-  const out = [];
-  out.push(`<defs><marker id="${id}a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" style="stroke:var(--s)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>`);
-  L.groups.forEach((g) => out.push(`<g><rect class="grp" x="${g.x}" y="${g.y}" width="${g.w}" height="${g.h}" rx="12"/><text class="tl" x="${g.x + 10}" y="${g.y + 14}">${esc(g.label)}</text></g>`));
+  const out = [], labels = [];
+  const mk = (sfx, cls) => `<marker id="${id}${sfx}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="${cls}" d="M1,1 L9,5 L1,9 z"/></marker>`;
+  const dots = el.dataset.paper === 'dots' ? `<pattern id="${id}d" width="22" height="22" patternUnits="userSpaceOnUse"><circle class="fdot" cx="1" cy="1" r="0.9"/></pattern>` : '';
+  out.push(`<defs>${mk('a', 'fm')}${mk('m', 'fm main')}${dots}</defs>`);
+  if (dots) out.push(`<rect x="0" y="0" width="100%" height="100%" fill="url(#${id}d)"/>`);
+  // Zones and groups sit behind the arrows. Their labels draw after the arrows, so no arrow covers a label.
+  L.groups.forEach((g) => {
+    out.push(g.zone ? `<rect class="zone" x="${g.x}" y="${g.y}" width="${g.w}" height="${g.h}" rx="4"/>` : `<rect class="grp" x="${g.x}" y="${g.y}" width="${g.w}" height="${g.h}" rx="6"/>`);
+    const x0 = g.anchor === 'start' ? g.lx - 3 : g.lx - g.lw;
+    labels.push((g.clash ? `<rect class="${g.zone ? 'zone-bg' : 'lbl-bg'}" x="${x0}" y="${g.ly}" width="${g.lw + 3}" height="${g.lh}"/>` : '') +
+      `<text class="fe" x="${g.lx}" y="${g.ly + 9.5}" text-anchor="${g.anchor}">${esc(g.label.toUpperCase())}</text>`);
+  });
   L.routes.forEach((r) => {
-    const d = r.pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
-    const cls = ['arr', r.e.dash ? 'dash' : '', r.e.bold ? 'bold' : ''].join(' ').trim();
-    out.push(`<path class="${cls}" d="${d}" marker-end="url(#${id}a)"${r.e.both ? ` marker-start="url(#${id}a)"` : ''}/>`);
+    const cls = ['arr', r.e.dash ? 'dash' : '', r.e.bold ? 'main' : ''].join(' ').trim(), mid = r.e.bold ? 'm' : 'a';
+    out.push(`<path class="${cls}" d="${elbow(r.pts)}" marker-end="url(#${id}${mid})"${r.e.both ? ` marker-start="url(#${id}${mid})"` : ''}/>`);
   });
   L.routes.forEach((r) => {
     if (!r.e.label) return;
     const lines = r.e.lines, tw = r.e.tw, th = r.e.th;
-    out.push(`<rect class="lbl-bg" x="${r.lx - tw / 2}" y="${r.ly - th / 2}" width="${tw}" height="${th}" rx="4"/>`);
-    lines.forEach((t, i) => out.push(`<text class="tl" x="${r.lx}" y="${r.ly + (i - (lines.length - 1) / 2) * 13}" text-anchor="middle" dominant-baseline="central">${esc(t)}</text>`));
+    out.push(`<rect class="lbl-bg" x="${r.lx - tw / 2}" y="${r.ly - th / 2}" width="${tw}" height="${th}" rx="2"/>`);
+    lines.forEach((t, i) => out.push(`<text class="fl${r.e.bold ? ' main' : ''}" x="${r.lx}" y="${r.ly + (i - (lines.length - 1) / 2) * 13}" text-anchor="middle" dominant-baseline="central">${esc(t.toUpperCase())}</text>`));
   });
+  out.push(...labels);
   Object.values(L.boxes).forEach((b) => {
-    const n = b.n, tone = TONE_CLASS[n.tone] || n.tone;
-    const rows = [...n.lines.map((t) => ['th', t, 16]), ...n.subLines.map((t) => ['ts', t, 14])];
-    const total = rows.reduce((s, r) => s + r[2], 0);
+    const n = b.n, tone = TONE_CLASS[n.tone] || n.tone, round = n.shape === 'pill' || n.shape === 'actor' || n.shape === 'circle';
+    const rows = [...n.lines.map((t) => ['fn', t, 16]), ...n.subLines.map((t) => ['fs', t, 14])];
+    const tagH = n.tag ? 16 : 0, total = rows.reduce((s, r) => s + r[2], 0) + tagH;
     let y = b.cy - total / 2 + (n.shape === 'db' ? 4 : 0);   // a cylinder's top curve takes space
-    const txt = rows.map(([c, t, lh]) => { const s = `<text class="${c}" x="${b.cx}" y="${y + lh / 2}" text-anchor="middle" dominant-baseline="central">${esc(t)}</text>`; y += lh; return s; }).join('');
+    let txt = '';
+    if (n.tag) {
+      // A box keeps its tag in the top-left corner. A round or tilted shape centers it above the name.
+      const tw = n.tag.length * 5.6 + 10, corner = !round && n.shape !== 'db' && n.shape !== 'diamond' && n.shape !== 'hex';
+      const tx = corner ? b.x + 8 : b.cx - tw / 2, ty = corner ? b.y + 7 : y + 1;
+      txt += `<rect class="ftag" x="${tx}" y="${ty}" width="${tw}" height="12" rx="2"/><text class="ftt" x="${tx + tw / 2}" y="${ty + 6.5}" text-anchor="middle" dominant-baseline="central">${esc(n.tag)}</text>`;
+      y += tagH;
+    }
+    txt += rows.map(([c, t, lh]) => { const s = `<text class="${c}" x="${b.cx}" y="${y + lh / 2}" text-anchor="middle" dominant-baseline="central">${esc(t)}</text>`; y += lh; return s; }).join('');
     const tip = n.detail.length ? `<title>${esc(n.detail.join('\n'))}</title>` : '';
-    out.push(`<g class="${[tone ? 'c-' + tone : '', n.mark ? 'mark-' + n.mark : ''].join(' ').trim()}">${tip}${shape(b)}${txt}</g>`);
+    out.push(`<g class="${['node', tone ? 'c-' + tone : '', n.mark ? 'mark-' + n.mark : ''].join(' ').trim()}">${tip}${shape(b)}${txt}</g>`);
   });
-  const W = Math.ceil(L.W), H = Math.ceil(L.H);
+  let W = Math.ceil(L.W), H = Math.ceil(L.H);
+  if (m.legend) {
+    // The legend lists only the parts that this flow uses.
+    const items = [];
+    if (Object.values(m.nodes).some((n) => n.mark === 'hl')) items.push(['focal', 'Focal']);
+    if (m.edges.some((e) => !e.dash && !e.bold)) items.push(['arr', 'Every time']);
+    if (m.edges.some((e) => e.bold)) items.push(['arr main', 'Main path']);
+    if (m.edges.some((e) => e.dash)) items.push(['arr dash', 'Sometimes']);
+    const y0 = H + 4, cy = y0 + 22; let x = 100;
+    out.push(`<line class="rule" x1="28" y1="${y0}" x2="${Math.max(W - 28, 240)}" y2="${y0}"/><text class="fe" x="28" y="${cy + 3.5}">LEGEND</text>`);
+    items.forEach(([k, label]) => {
+      if (k === 'focal') out.push(`<g class="node mark-hl"><rect class="box" x="${x}" y="${cy - 6}" width="18" height="12" rx="3"/></g>`);
+      else out.push(`<path class="${k}" d="M${x},${cy} L${x + 22},${cy}" marker-end="url(#${id}${k.includes('main') ? 'm' : 'a'})"/>`);
+      out.push(`<text class="flg" x="${x + 30}" y="${cy}" dominant-baseline="central">${esc(label)}</text>`);
+      x += 30 + label.length * 6.6 + 26;
+    });
+    W = Math.max(W, x); H = cy + 14;
+  }
   const label = el.getAttribute('aria-label') || el.closest('figure')?.querySelector('figcaption')?.textContent || 'Flow diagram';
   el.style.setProperty('--w', W + 'px');
   el.innerHTML = (m.errors.length ? `<div class="k-err">${esc('Flow spec errors:\n' + m.errors.join('\n'))}</div>` : '') +
     `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label.trim())}" xmlns="http://www.w3.org/2000/svg">${out.join('')}</svg>`;
+}
+
+/* ─── Diagram templates: <figure class="k-diagram"> with an SVG from skills/explain/diagrams ───
+   The templates use the diagram-design palette. drawDiagram maps each palette color, at any alpha,
+   to a kit token, so a template follows the light and dark themes. Other colors stay as they are.
+   It also makes the ids unique, so two templates on one page do not share a marker or a pattern. */
+let diagramN = 0;
+const COLOR_ATTRS = ['fill', 'stroke', 'stop-color', 'flood-color', 'color'];
+function drawDiagram(fig) {
+  const pre = 'kd' + (++diagramN) + '-';
+  const els = [...fig.querySelectorAll('svg, svg *')];
+  const ids = new Set(els.map((e) => e.id).filter(Boolean));
+  const ref = (v) => v.replace(/url\(#([^)]+)\)/g, (x, i) => ids.has(i) ? `url(#${pre}${i})` : x);
+  els.forEach((e) => {
+    if (e.id) e.id = pre + e.id;
+    for (const at of [...e.attributes]) {
+      if (/url\(#/.test(at.value)) e.setAttribute(at.name, ref(at.value));
+      else if ((at.name === 'href' || at.name === 'xlink:href') && at.value.startsWith('#') && ids.has(at.value.slice(1))) e.setAttribute(at.name, '#' + pre + at.value.slice(1));
+      else if ((at.name === 'aria-labelledby' || at.name === 'aria-describedby')) e.setAttribute(at.name, at.value.split(/\s+/).map((i) => ids.has(i) ? pre + i : i).join(' '));
+    }
+    COLOR_ATTRS.forEach((p) => { const c = diagramColor(e.getAttribute(p)); if (c) e.style.setProperty(p, c); });
+  });
+  // The figure scrolls sideways before its text draws much smaller than the size the template sets.
+  const svg = fig.querySelector('svg'), vb = svg?.viewBox?.baseVal;
+  if (vb && vb.width) fig.style.setProperty('--d-min', Math.round(vb.width * 0.85) + 'px');
+  fig.dataset.kReady = '';
 }
 
 /* ─── Score dots: <span class="k-dots" data-score="3/5"> ─── */
@@ -629,6 +736,7 @@ function init() {
   document.documentElement.classList.remove('no-js');
   document.querySelectorAll('main.k-deck').forEach(runDeck);
   document.querySelectorAll('.k-flow').forEach((el) => { try { drawFlow(el); } catch (e) { el.innerHTML = `<div class="k-err">${esc(e.message)}</div>`; } });
+  document.querySelectorAll('figure.k-diagram').forEach((el) => { try { drawDiagram(el); } catch (e) { el.insertAdjacentHTML('afterbegin', `<div class="k-err">${esc(e.message)}</div>`); } });
   document.querySelectorAll('.k-dots[data-score]').forEach(drawDots);
   document.querySelectorAll('.k-model').forEach(runModel);
   document.querySelectorAll('.k-steps').forEach(runSteps);

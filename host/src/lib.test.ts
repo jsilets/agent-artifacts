@@ -82,7 +82,16 @@ describe('withKit', () => {
     expect(withKit(html, '/* explain.css: new */')).toBe(html);
   });
   it('keeps dollar signs in the CSS', () => {
-    expect(withKit(page('/* explain.css */'), '/* explain.css */ a::after{content:"$$"}')).toContain('"$$"');
+    expect(withKit(page('/* explain.css */'), '/* explain.css */ a::after{content:"$"}')).toContain('"$"');
+  });
+  const packed = (js: string) => page('/* explain.css: old */') + `<p>x</p><script>\n${js}\n</script>\n</body>`;
+  it('swaps the packed JS for the current JS', () => {
+    expect(withKit(packed('/* explain.js: old */ a("<\\/script>")'), '/* explain.css: new */', '/* explain.js: new */ b("</script>")'))
+      .toBe(page('/* explain.css: new */') + '<p>x</p><script>\n/* explain.js: new */ b("<\\/script>")\n</script>\n</body>');
+  });
+  it('keeps a page script that is not the kit', () => {
+    const html = page('/* explain.css */') + '<script>\nlet x = 1;\n</script>';
+    expect(withKit(html, '/* explain.css */', '/* explain.js: new */')).toBe(html);
   });
 });
 

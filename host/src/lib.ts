@@ -130,13 +130,19 @@ export function withTheme(html: string, theme: Theme): string {
 }
 
 /**
- * A packed page carries the kit CSS from the day it was published. This swaps in the current kit,
- * so old pages and their thumbnails show the current look. A page without the packed kit is unchanged.
+ * A packed page carries the kit CSS and JS from the day it was published. This swaps in the current kit,
+ * so old pages and their thumbnails show the current look and drawing. A page without the packed kit is unchanged.
+ * The JS swap is optional, so a caller can pass the CSS alone.
  */
-export function withKit(html: string, css: string): string {
+export function withKit(html: string, css: string, js?: string): string {
   const start = html.indexOf('<style>\n/* explain.css');
   const end = start < 0 ? -1 : html.indexOf('</style>', start);
-  return end < 0 ? html : html.slice(0, start) + '<style>\n' + css + '\n' + html.slice(end);
+  if (end >= 0) html = html.slice(0, start) + '<style>\n' + css + '\n' + html.slice(end);
+  if (js == null) return html;
+  // cli/agent-pages.mjs packs the JS as <script>\n/* explain.js…</script>, with each "</script" escaped inside it.
+  const js0 = html.indexOf('<script>\n/* explain.js');
+  const js1 = js0 < 0 ? -1 : html.indexOf('</script>', js0);
+  return js1 < 0 ? html : html.slice(0, js0) + '<script>\n' + js.replace(/<\/script/gi, '<\\/script') + '\n' + html.slice(js1);
 }
 
 // ─── Search ─────────────────────────────────────────────────────────

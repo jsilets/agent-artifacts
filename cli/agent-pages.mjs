@@ -201,7 +201,7 @@ function lintShared(html, err, warn) {
   const body = html.replace(/<!--[\s\S]*?-->/g, '').replace(/<head[\s\S]*?<\/head>/i, '');
   const authored = body.replace(/<(blockquote|q)\b[^>]*>[\s\S]*?<\/\1>/gi, ' ');
   const text = strip(authored);
-  const proseEls = [...authored.matchAll(/<(p|figcaption|li|h2|h3|td)[^>]*>([\s\S]*?)<\/\1>/g)].map((m) => strip(m[2]));
+  const proseEls = [...authored.matchAll(/<(p|figcaption|li|h2|h3|td)\b[^>]*>([\s\S]*?)<\/\1>/g)].map((m) => strip(m[2]));
   proseEls.flatMap(sentences).forEach((s) => { const w = nwords(s); if (w > 28) warn(`a sentence has ${w} words: "${s.slice(0, 70)}…"`); });
   if (/—/.test(text)) warn('the prose has an em dash. Write two sentences instead');
   const low = ' ' + text.toLowerCase() + ' ';
@@ -209,9 +209,10 @@ function lintShared(html, err, warn) {
   if (found.length) warn('word suggestions (preserve meaning): ' + found.map((k) => `"${k}" → ${STE[k]}`).join(', '));
   if (/(?:→|->)[^<]{1,40}(?:→|->)/.test(text)) warn('the text has a chain of arrows. Consider .k-flow if a diagram would clarify the sequence');
 
-  // Look
-  if (/style="[^"]*(?:color|background|font|border)/i.test(body)) warn('an inline style sets a color, font or border. Use the c-* classes and the kit components');
-  if (/<style[\s>]/i.test(body)) warn('the page has its own <style> block. Use the kit classes; add CSS only for a figure the kit cannot draw');
+  // Look. A diagram template carries its own CSS and inline styles, so these two checks skip it.
+  const own = body.replace(/<figure class="k-diagram[\s\S]*?<\/figure>/g, ' ');
+  if (/style="[^"]*(?:color|background|font|border)/i.test(own)) warn('an inline style sets a color, font or border. Use the c-* classes and the kit components');
+  if (/<style[\s>]/i.test(own)) warn('the page has its own <style> block. Use the kit classes; add CSS only for a figure the kit cannot draw');
   [...body.matchAll(/<table[\s\S]*?<\/table>/g)].forEach((m, i) => {
     const cols = Math.max(0, ...[...m[0].matchAll(/<tr[\s\S]*?<\/tr>/g)].map((r) => (r[0].match(/<t[dh][\s>]/g) || []).length));
     const rows = (m[0].match(/<tr[\s>]/g) || []).length;
@@ -225,9 +226,23 @@ function lintShared(html, err, warn) {
     f.errors.forEach((e) => err(`flow ${i + 1}: ${e}`));
     const n = Object.keys(f.nodes).length;
     if (n > 12) warn(`flow ${i + 1} has ${n} nodes. Check label readability; split or group parts if needed`);
+    const tagged = Object.values(f.nodes).filter((x) => x.tag).length;
+    if (tagged && tagged < n) warn(`flow ${i + 1}: ${tagged} of ${n} nodes have a tag. Tag every node or none`);
     if (f.edges.length && f.edges.filter((e) => !e.label).length > f.edges.length / 2) warn(`flow ${i + 1}: most arrows have no label. Add labels where an action or condition is unclear`);
     if (!f.errors.length && n) { const L = E.layoutFlow(f); if (L.W > 1100) warn(`flow ${i + 1} is ${Math.round(L.W)}px wide and will shrink a lot. Use dir TB, a grid, or shorter labels`); }
   });
+
+  // Diagram templates
+  [...body.matchAll(/<figure class="k-diagram[^"]*"[^>]*>([\s\S]*?)<\/figure>/g)].forEach((m, i) => {
+    const no = `diagram ${i + 1}`, fig = m[1];
+    if (!/<svg\b/.test(fig)) err(`${no}: no <svg>. Copy the whole figure from a template in skills/explain/diagrams`);
+    else if (!/<div class="k-art">\s*<svg\b/.test(fig)) err(`${no}: put the <svg> inside <div class="k-art">, as the template does`);
+    if (!/<svg\b[^>]*\brole="img"/.test(fig) || !/<svg\b[^>]*\baria-(?:label|labelledby)=/.test(fig)) warn(`${no}: the <svg> needs role="img" and an aria-label or aria-labelledby`);
+    const cap = fig.match(/<figcaption>([\s\S]*?)<\/figcaption>/);
+    if (!cap) warn(`${no}: no <figcaption>. Say what the reader should see in the diagram`);
+    else if (/^Replace this caption/.test(strip(cap[1]))) err(`${no}: the figcaption still holds the template text`);
+  });
+  if (/<(?:div|figure) class="(?:k-scroll|k-grid)[^"]*"[^>]*>\s*<figure class="k-diagram/.test(body)) warn('a .k-diagram is inside a .k-scroll or a .k-grid. The figure scrolls on its own; put it directly in the section');
 
   // Models
   [...html.matchAll(/<div class="k-model"[\s\S]*?<script type="text\/plain" data-defs>([\s\S]*?)<\/script>/g)].forEach((m, i) => {

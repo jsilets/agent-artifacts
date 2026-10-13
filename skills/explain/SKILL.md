@@ -70,7 +70,7 @@ For substantial work, use a separate reader review when available and appropriat
 
 ## Make, check, and show the HTML
 
-Read [references/exhibits.md](references/exhibits.md) for markup and consult [examples/gallery.html](examples/gallery.html) for component examples. The CLI and `kit/explain.css` and `kit/explain.js` live in the Agent Pages repo.
+Read [references/exhibits.md](references/exhibits.md) for markup and consult [examples/gallery.html](examples/gallery.html) for component examples. For a diagram with its own geometry, such as a sequence, a timeline or a Sankey, start from a template: read [diagrams/index.md](diagrams/index.md). The CLI and `kit/explain.css` and `kit/explain.js` live in the Agent Pages repo.
 
 Use the kit for consistent appearance. Add custom styling only for a needed chart or diagram the kit cannot express. Keep colors consistent, labels readable, and status understandable without color. Give diagrams a textual equivalent.
 

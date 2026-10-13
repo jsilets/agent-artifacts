@@ -2,6 +2,7 @@
 // A page runs only inside the sandboxed iframe, from the /raw or /s/<token>/raw route.
 
 import kitCss from '../../kit/explain.css?raw';
+import kitJs from '../../kit/explain.js?raw';
 
 /**
  * A short hash of the kit. Pages and thumbnails are cached for a year, and the host builds both
@@ -9,7 +10,8 @@ import kitCss from '../../kit/explain.css?raw';
  */
 export const KIT = (() => {
   let h = 0x811c9dc5;
-  for (let i = 0; i < kitCss.length; i++) h = Math.imul(h ^ kitCss.charCodeAt(i), 0x01000193);
+  const kit = kitCss + kitJs;
+  for (let i = 0; i < kit.length; i++) h = Math.imul(h ^ kit.charCodeAt(i), 0x01000193);
   return (h >>> 0).toString(36);
 })();
 
